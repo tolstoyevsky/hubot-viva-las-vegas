@@ -1,0 +1,30 @@
+{
+  "name": "hubot-viva-las-vegas",
+  "description": "A Hubot script which helps users to create leave requests",
+  "version": "0.0.1",
+  "author": "Evgeny Golyshev <eugulixes@gmail.com>",
+  "license": "Apache-2.0",
+  "keywords": [
+    "hubot",
+    "hubot-scripts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tolstoyevsky/hubot-viva-las-vegas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tolstoyevsky/hubot-viva-las-vegas/issues"
+  },
+  "dependencies": {
+    "moment": "^2.22.2",
+    "node-schedule": "^0.6.0"
+  },
+  "devDependencies": {
+    "eslint": "^5.5.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-node": "^7.0.1",
+    "eslint-plugin-promise": "^4.0.0",
+    "eslint-plugin-standard": "^4.0.0"
+  }
+}
