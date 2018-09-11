@@ -1,3 +1,5 @@
+[![build](https://travis-ci.org/tolstoyevsky/hubot-viva-las-vegas.svg?branch=master)](https://travis-ci.org/tolstoyevsky/hubot-viva-las-vegas)
+
 # hubot-viva-las-vegas
 
 A Hubot script which helps users to create leave requests.
