@@ -26,5 +26,10 @@
     "eslint-plugin-node": "^7.0.1",
     "eslint-plugin-promise": "^4.0.0",
     "eslint-plugin-standard": "^4.0.0"
+  },
+  "scripts": {
+    "lint": "eslint . --ext .js",
+    "pretest": "npm run lint",
+    "test": "echo \"No tests\""
   }
 }
