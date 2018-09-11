@@ -14,7 +14,7 @@
 
 module.exports = function (robot) {
   const moment = require('moment')
-  const schedule = require('node-schedule');
+  const schedule = require('node-schedule')
 
   const LEAVE_COORDINATION_CHANNEL = process.env.LEAVE_COORDINATION_CHANNEL || 'leave-coordination'
   const MAXIMUM_LENGTH_OF_LEAVE = parseInt(process.env.MAXIMUM_LENGTH_OF_LEAVE, 10) || 28
@@ -209,7 +209,6 @@ module.exports = function (robot) {
   robot.respond(/(одобрить|отклонить) заявку @?(.+)$/i, function (msg) {
     const action = msg.match[1]
     const username = msg.match[2].trim()
-    const usernames = Object.values(robot.brain.data.users).map(user => user.name)
 
     if (checkIfUserExists(robot, username)) {
       const state = getStateFromBrain(robot, username)
@@ -234,7 +233,7 @@ module.exports = function (robot) {
 
       msg.send(`Заявка @${username} ${result}. Я отправлю ему уведомление об этом.`)
 
-      robot.adapter.sendDirect({user: {name: username}}, `Заявка на отпуск ${result}.`)
+      robot.adapter.sendDirect({ user: { name: username } }, `Заявка на отпуск ${result}.`)
     } else {
       msg.send('Пользователя с таким именем нет или я его просто не знаю, т.к. он ни разу не говорил со мной.')
     }
