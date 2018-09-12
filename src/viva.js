@@ -159,7 +159,7 @@ module.exports = function (robot) {
     if (state.n === TO_STATE) {
       const leaveStart = state.leaveStart
       const leaveEnd = {}
-      const year = leaveStart.month > month ? moment().year() + 1 : moment().year()
+      const year = leaveStart.day >= day && leaveStart.month >= month ? moment().year() + 1 : moment().year()
       const d1 = moment(`${leaveStart.day}.${leaveStart.month}.${leaveStart.year}`, 'D.M.YYYY')
       const d2 = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
       const daysNumber = d2.diff(d1, 'days')
