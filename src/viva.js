@@ -10,6 +10,7 @@
 //   hubot хочу в отпуск - initiates a new leave request
 //   hubot одобрить заявку @username - approves the leave request for the specifies user
 //   hubot отклонить заявку @username - rejects the leave request for the specifies user
+//   hubot отменить заявку @username - cancels the leave request for the specifies user
 //
 
 module.exports = function (robot) {
@@ -218,6 +219,26 @@ module.exports = function (robot) {
       }
 
       state.n = INIT_STATE
+    }
+  })
+
+  robot.respond(/(отменить заявку @?(.+))$/i, function (msg) {
+    const username = msg.match[2].trim()
+    const state = getStateFromBrain(robot, username)
+
+    const isRequestStatus = state.requestStatus && state.requestStatus !== READY_TO_APPLY_STATUS
+
+    if (isRequestStatus) {
+      state.n = INIT_STATE
+      delete state.leaveStart
+      delete state.leaveEnd
+      delete state.requestStatus
+
+      robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}`)
+      robot.adapter.sendDirect({ user: { name: username } }, 'Ваша заявка на отпуск отменена')
+      msg.send(`Отпуск пользователя @${username} отменен`)
+    } else {
+      msg.send('Этот человек не собирается в отпуск')
     }
   })
 
