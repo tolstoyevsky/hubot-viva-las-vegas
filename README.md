@@ -6,7 +6,8 @@ A Hubot script which helps users to create leave requests.
 
 ## Prerequisites
 
-The bot must be in the channel specified via the `LEAVE_COORDINATION_CHANNEL` environment variable.
+* The bot must be in the channel specified via the `LEAVE_COORDINATION_CHANNEL` environment variable.
+* The bot has to have `view-full-other-user-info` permission.
 
 ## Installation
 

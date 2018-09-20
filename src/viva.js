@@ -8,9 +8,9 @@
 //
 // Commands:
 //   hubot хочу в отпуск - initiates a new leave request
-//   hubot одобрить заявку @username - approves the leave request for the specified user
-//   hubot отклонить заявку @username - rejects the leave request for the specified user
-//   hubot отменить заявку @username - cancels the approved leave request for the specified user
+//   hubot одобрить заявку @username - approves the leave request for the specified user (privileged: admins only)
+//   hubot отклонить заявку @username - rejects the leave request for the specified user (privileged: admins only)
+//   hubot отменить заявку @username - cancels the approved leave request for the specified user (privileged: admins only)
 //
 
 module.exports = async (robot) => {
@@ -33,6 +33,8 @@ module.exports = async (robot) => {
   const READY_TO_APPLY_STATUS = 'ready-to-apply'
 
   const ANGRY_MESSAGE = 'Давай по порядку!'
+
+  const ACCESS_DENIED = 'У вас недостаточно прав для этой команды'
 
   const regExpMonthYear = new RegExp(/((0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2]))$/)
 
@@ -58,6 +60,26 @@ module.exports = async (robot) => {
     `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
     'Отправить текущую заявку в HR-отдел? (да/нет)'
   ])
+
+  /**
+   * Use API returns user has a role
+   * @param {Robot} robot Hubot instance
+   * @param {string} username Username
+   * @return {boolean}
+   */
+  async function isAdmin (robot, username) {
+    const info = await robot.adapter.api.get('users.info', { username: username })
+
+    if (!info.user) {
+      throw new Error('User data did not include roles')
+    }
+
+    if (!info.user.roles) {
+      throw new Error('User data did not include roles')
+    }
+
+    return info.user.roles.indexOf('admin') !== -1
+  }
 
   function checkIfUserExists (robot, username) {
     const users = robot.brain.data.users
@@ -232,7 +254,12 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(отменить заявку @?(.+))$/i, function (msg) {
+  robot.respond(/(отменить заявку @?(.+))$/i, async (msg) => {
+    if (!await isAdmin(robot, msg.message.user.name)) {
+      msg.send(ACCESS_DENIED)
+      return
+    }
+
     const username = msg.match[2].trim()
     const state = getStateFromBrain(robot, username)
 
@@ -252,9 +279,14 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(одобрить|отклонить) заявку @?(.+)$/i, function (msg) {
+  robot.respond(/(одобрить|отклонить) заявку @?(.+)$/i, async (msg) => {
     const action = msg.match[1]
     const username = msg.match[2].trim()
+
+    if (!await isAdmin(robot, msg.message.user.name)) {
+      msg.send(ACCESS_DENIED)
+      return
+    }
 
     if (checkIfUserExists(robot, username)) {
       const state = getStateFromBrain(robot, username)
