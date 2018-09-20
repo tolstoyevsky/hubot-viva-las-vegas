@@ -19,6 +19,7 @@ module.exports = function (robot) {
   const LEAVE_COORDINATION_CHANNEL = process.env.LEAVE_COORDINATION_CHANNEL || 'leave-coordination'
   const MAXIMUM_LENGTH_OF_LEAVE = parseInt(process.env.MAXIMUM_LENGTH_OF_LEAVE, 10) || 28
   const MAXIMUM_LENGTH_OF_WAIT = parseInt(process.env.MAXIMUM_LENGTH_OF_WAIT, 10) || 7
+  const MINIMUM_DAYS_BEFORE_REQUEST = parseInt(process.env.MINIMUM_DAYS_BEFORE_REQUEST, 14) || 14
   const REMINDER_SCHEDULER = process.env.REMINDER_SCHEDULER || '0 0 7 * * *'
 
   const INIT_STATE = 0
@@ -77,6 +78,8 @@ module.exports = function (robot) {
   function noname (daysNumber) {
     const lastDigit = parseInt(daysNumber.toString().split('').pop(), 10)
     switch (lastDigit) {
+      case 0:
+        return `${daysNumber} дней`
       case 1:
         return `${daysNumber} день`
       case 2:
@@ -131,8 +134,8 @@ module.exports = function (robot) {
 
   robot.respond(regExpMonthYear, function (msg) {
     const date = msg.match[1]
-    const day = msg.match[2]
-    const month = msg.match[3]
+    const day = parseInt(msg.match[2])
+    const month = parseInt(msg.match[3])
     const state = getStateFromBrain(robot, msg.message.user.name)
 
     if (!isValidDate(date)) {
@@ -142,11 +145,23 @@ module.exports = function (robot) {
     }
 
     if (state.n === FROM_STATE) {
+      const today = moment()
+      // moment().month() starts counting with 0
+      const year = today.month() + 1 >= month && today.date() >= day ? today.year() + 1 : today.year()
+      const startDay = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
+      const daysBefore = startDay.diff(today, 'days')
+
+      if (daysBefore < MINIMUM_DAYS_BEFORE_REQUEST) {
+        const minDate = today.add(MINIMUM_DAYS_BEFORE_REQUEST, 'd').format('DD.MM.YYYY')
+        msg.send(`Нужно запрашивать отпуск минимум за ${noname(MINIMUM_DAYS_BEFORE_REQUEST)}, а до твоего - только ${noname(daysBefore)}. Попробуй выбрать дату позднее ${minDate}.`)
+        return
+      }
+
       const leaveStart = {}
 
       leaveStart.day = day
       leaveStart.month = month
-      leaveStart.year = moment().year()
+      leaveStart.year = year
 
       state.leaveStart = leaveStart
       state.n = TO_STATE
@@ -159,7 +174,7 @@ module.exports = function (robot) {
     if (state.n === TO_STATE) {
       const leaveStart = state.leaveStart
       const leaveEnd = {}
-      const year = leaveStart.day >= day && leaveStart.month >= month ? moment().year() + 1 : moment().year()
+      const year = leaveStart.month >= month && leaveStart.day >= day ? leaveStart.year + 1 : leaveStart.year
       const d1 = moment(`${leaveStart.day}.${leaveStart.month}.${leaveStart.year}`, 'D.M.YYYY')
       const d2 = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
       const daysNumber = d2.diff(d1, 'days')
