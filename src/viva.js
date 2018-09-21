@@ -8,9 +8,9 @@
 //
 // Commands:
 //   hubot хочу в отпуск - initiates a new leave request
-//   hubot одобрить заявку @username - approves the leave request for the specifies user
-//   hubot отклонить заявку @username - rejects the leave request for the specifies user
-//   hubot отменить заявку @username - cancels the leave request for the specifies user
+//   hubot одобрить заявку @username - approves the leave request for the specified user
+//   hubot отклонить заявку @username - rejects the leave request for the specified user
+//   hubot отменить заявку @username - cancels the approved leave request for the specified user
 //
 
 module.exports = function (robot) {
