@@ -13,7 +13,7 @@
 //   hubot отменить заявку @username - cancels the approved leave request for the specified user
 //
 
-module.exports = function (robot) {
+module.exports = async (robot) => {
   const moment = require('moment')
   const schedule = require('node-schedule')
 
@@ -35,6 +35,16 @@ module.exports = function (robot) {
   const ANGRY_MESSAGE = 'Давай по порядку!'
 
   const regExpMonthYear = new RegExp(/((0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2]))$/)
+
+  // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
+  const botChannels = await robot.adapter.api.get('channels.list.joined')
+  const botGroups = await robot.adapter.api.get('groups.list')
+  const chExists = botChannels.channels.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
+  const grExists = botGroups.groups.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
+  if (!chExists && !grExists) {
+    robot.logger.error(`Hubot is not in the group or channel named '${LEAVE_COORDINATION_CHANNEL}'`)
+    return
+  }
 
   // Here is the format string which is suitable for the following cases: DD.MM, D.M
   // See https://momentjs.com/docs/#/parsing/string-format/ for details.
