@@ -36,7 +36,7 @@ module.exports = async (robot) => {
 
   const ACCESS_DENIED = 'У вас недостаточно прав для этой команды'
 
-  const regExpMonthYear = new RegExp(/((0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2]))$/)
+  const regExpMonthYear = new RegExp(/((0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2]))\s*/)
 
   // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
   const botChannels = await robot.adapter.api.get('channels.list.joined')
@@ -138,7 +138,7 @@ module.exports = async (robot) => {
     }
   }
 
-  robot.respond(/хочу в отпуск$/i, function (msg) {
+  robot.respond(/хочу в отпуск\s*/i, function (msg) {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
     if (state.n !== undefined && state.n !== INIT_STATE) {
@@ -229,7 +229,7 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(да|нет)$/i, function (msg) {
+  robot.respond(/(да|нет)\s*/i, function (msg) {
     const username = msg.message.user.name
     const state = getStateFromBrain(robot, username)
 
@@ -254,7 +254,7 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(отменить заявку @?(.+))$/i, async (msg) => {
+  robot.respond(/(отменить заявку @?(.+))\s*/i, async (msg) => {
     if (!await isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED)
       return
@@ -278,8 +278,7 @@ module.exports = async (robot) => {
       msg.send('Этот человек не собирается в отпуск')
     }
   })
-
-  robot.respond(/(одобрить|отклонить) заявку @?(.+)$/i, async (msg) => {
+  robot.respond(/(одобрить|отклонить) заявку @?(.+)\s*/i, async (msg) => {
     const action = msg.match[1]
     const username = msg.match[2].trim()
 
