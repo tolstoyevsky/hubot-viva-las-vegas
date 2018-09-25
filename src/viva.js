@@ -271,7 +271,10 @@ module.exports = async (robot) => {
       delete state.leaveEnd
       delete state.requestStatus
 
-      robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}`)
+      if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}`)
+      }
+
       robot.adapter.sendDirect({ user: { name: username } }, 'Ваша заявка на отпуск отменена')
       msg.send(`Отпуск пользователя @${username} отменен`)
     } else {
