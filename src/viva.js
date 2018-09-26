@@ -97,6 +97,17 @@ module.exports = async (robot) => {
   }
 
   /**
+   * Check if two specified dates have the same month and day.
+   *
+   * @param {moment} firstDate
+   * @param {moment} secondsDate
+   * @returns {boolean}
+   */
+  function isEqualMonthDay (firstDate, secondsDate) {
+    return (firstDate.month() === secondsDate.month()) && (firstDate.date() === secondsDate.date())
+  }
+
+  /**
    * Checks if the specified date
    * 1. follows the format stored in the DATE_FORMAT constant
    * 2. is a valid date.
@@ -134,6 +145,33 @@ module.exports = async (robot) => {
         const deadline = moment(state.creationDate, CREATION_DATE_FORMAT).add(MAXIMUM_LENGTH_OF_WAIT, 'days').format('DD.MM')
 
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Нужно дать ответ @${user.name} до ${deadline}.`)
+      }
+    }
+  }
+
+  /**
+   * Reset the leave status of the users if their vacation is over.
+   * @param {Robot} robot Hubot instance
+   * @returns {Void}
+   */
+  function resetLeaveStatus (robot) {
+    const users = robot.brain.data.users
+
+    for (const user of Object.values(users)) {
+      const state = getStateFromBrain(robot, user.name)
+
+      if (state.requestStatus === APPROVED_STATUS) {
+        const yesterday = moment().add(-1, 'day')
+        const userEndVacation = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M')
+
+        if (isEqualMonthDay(yesterday, userEndVacation)) {
+          state.n = INIT_STATE
+          delete state.leaveStart
+          delete state.leaveEnd
+          delete state.requestStatus
+
+          robot.adapter.sendDirect({ user: { name: user.name } }, 'С возвращением из отпуска')
+        }
       }
     }
   }
@@ -324,7 +362,39 @@ module.exports = async (robot) => {
     }
   })
 
+  /**
+   * Overwrites vacation ending date
+   * @example viva reset @username DD.MM
+   */
+  robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}))\s*/i, async (msg) => {
+    if (!await isAdmin(robot, msg.message.user.name)) {
+      msg.send(ACCESS_DENIED)
+      return
+    }
+
+    const username = msg.match[2]
+    const dateMonth = msg.match[3]
+
+    if (!isValidDate(dateMonth)) {
+      msg.send('Invalid date')
+
+      return
+    }
+
+    const user = robot.brain.userForName(username)
+
+    user.vivaLasVegas.leaveEnd = {
+      day: dateMonth.split('.')[0],
+      month: dateMonth.split('.')[1],
+      year: moment().year()
+    }
+
+    msg.send('ok')
+  })
+
   if (REMINDER_SCHEDULER) {
     schedule.scheduleJob(REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
+
+    schedule.scheduleJob(REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
   }
 }
