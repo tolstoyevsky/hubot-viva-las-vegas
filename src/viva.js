@@ -312,6 +312,11 @@ module.exports = async (robot) => {
 
       state.requestStatus = requestStatus
 
+      if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
+        const admin = msg.message.user.name
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Заявка на отпуск пользователя @${username} была ${result} пользователем @${admin}`)
+      }
+
       msg.send(`Заявка @${username} ${result}. Я отправлю ему уведомление об этом.`)
 
       robot.adapter.sendDirect({ user: { name: username } }, `Заявка на отпуск ${result}.`)
