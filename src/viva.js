@@ -15,6 +15,7 @@
 
 module.exports = async (robot) => {
   const moment = require('moment')
+  const routines = require('hubot-routines')
   const schedule = require('node-schedule')
 
   const LEAVE_COORDINATION_CHANNEL = process.env.LEAVE_COORDINATION_CHANNEL || 'leave-coordination'
@@ -45,7 +46,7 @@ module.exports = async (robot) => {
   const chExists = botChannels.channels.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
   const grExists = botGroups.groups.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
   if (!chExists && !grExists) {
-    robot.logger.error(`Hubot is not in the group or channel named '${LEAVE_COORDINATION_CHANNEL}'`)
+    routines.rave(robot, `Hubot is not in the group or channel named '${LEAVE_COORDINATION_CHANNEL}'`)
     return
   }
 
@@ -61,27 +62,6 @@ module.exports = async (robot) => {
     `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
     'Отправить текущую заявку в HR-отдел? (да/нет)'
   ])
-
-  /**
-   * Use API to check if the specified user is admin.
-   *
-   * @param {Robot} robot - Hubot instance.
-   * @param {string} username - Username.
-   * @return {boolean}
-   */
-  async function isAdmin (robot, username) {
-    const info = await robot.adapter.api.get('users.info', { username: username })
-
-    if (!info.user) {
-      throw new Error('User data did not include roles')
-    }
-
-    if (!info.user.roles) {
-      throw new Error('User data did not include roles')
-    }
-
-    return info.user.roles.indexOf('admin') !== -1
-  }
 
   function checkIfUserExists (robot, username) {
     const users = robot.brain.data.users
@@ -107,18 +87,6 @@ module.exports = async (robot) => {
    */
   function isEqualMonthDay (firstDate, secondsDate) {
     return (firstDate.month() === secondsDate.month()) && (firstDate.date() === secondsDate.date())
-  }
-
-  /**
-   * Checks if the specified date
-   * 1. follows the format stored in the DATE_FORMAT constant;
-   * 2. is a valid date.
-   *
-   * @param {string} date - Date to be validated.
-   * @returns {boolean}
-   */
-  function isValidDate (date) {
-    return typeof date === 'string' && moment(date, DATE_FORMAT, true).isValid()
   }
 
   function noname (daysNumber) {
@@ -237,7 +205,7 @@ module.exports = async (robot) => {
     const month = parseInt(msg.match[3])
     const state = getStateFromBrain(robot, msg.message.user.name)
 
-    if (!isValidDate(date)) {
+    if (!routines.isValidDate(date, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
 
       return
@@ -335,7 +303,7 @@ module.exports = async (robot) => {
   })
 
   robot.respond(/(отменить заявку @?(.+))\s*/i, async (msg) => {
-    if (!await isAdmin(robot, msg.message.user.name)) {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED_MSG)
       return
     }
@@ -367,7 +335,7 @@ module.exports = async (robot) => {
     const action = msg.match[1]
     const username = msg.match[2].trim()
 
-    if (!await isAdmin(robot, msg.message.user.name)) {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED_MSG)
       return
     }
@@ -412,7 +380,7 @@ module.exports = async (robot) => {
    * @example viva reset @username DD.MM.
    */
   robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}))\s*/i, async (msg) => {
-    if (!await isAdmin(robot, msg.message.user.name)) {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED_MSG)
       return
     }
@@ -420,7 +388,7 @@ module.exports = async (robot) => {
     const username = msg.match[2]
     const dateMonth = msg.match[3]
 
-    if (!isValidDate(dateMonth)) {
+    if (!routines.isValidDate(dateMonth, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
 
       return
