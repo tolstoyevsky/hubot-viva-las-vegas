@@ -36,7 +36,7 @@ module.exports = async (robot) => {
 
   const ACCESS_DENIED = 'У вас недостаточно прав для этой команды'
 
-  const regExpMonthYear = new RegExp(/((0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2]))\s*/)
+  const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*/)
 
   // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
   const botChannels = await robot.adapter.api.get('channels.list.joined')
