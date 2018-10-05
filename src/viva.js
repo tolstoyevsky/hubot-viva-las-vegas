@@ -244,7 +244,21 @@ module.exports = async (robot) => {
     if (state.n === FROM_STATE) {
       const today = moment()
       // moment().month() starts counting with 0
-      const year = today.month() + 1 >= month && today.date() >= day ? today.year() + 1 : today.year()
+      const currentMonth = today.month() + 1
+      let year
+
+      if (currentMonth === month) {
+        if (today.date() >= day) {
+          year = today.year() + 1
+        } else {
+          year = today.year()
+        }
+      } else if (currentMonth > month) {
+        year = today.year() + 1
+      } else {
+        year = today.year()
+      }
+
       const startDay = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
       const daysBefore = startDay.diff(today, 'days')
 
