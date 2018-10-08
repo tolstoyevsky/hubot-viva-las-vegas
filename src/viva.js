@@ -121,6 +121,12 @@ module.exports = async (robot) => {
   }
 
   function noname (daysNumber) {
+    const lastTwoDigits = daysNumber.toString().slice(daysNumber.length - 2)
+    const exceptionDaysEnd = ['11', '12', '13', '14']
+    if (exceptionDaysEnd.includes(lastTwoDigits)) {
+      return `${daysNumber} дней`
+    }
+
     const lastDigit = parseInt(daysNumber.toString().split('').pop(), 10)
     switch (lastDigit) {
       case 0:
