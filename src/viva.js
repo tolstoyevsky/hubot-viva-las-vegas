@@ -62,9 +62,10 @@ module.exports = async (robot) => {
   ])
 
   /**
-   * Use API returns user has a role
-   * @param {Robot} robot Hubot instance
-   * @param {string} username Username
+   * Use API to check if the specified user is admin.
+   *
+   * @param {Robot} robot - Hubot instance.
+   * @param {string} username - Username.
    * @return {boolean}
    */
   async function isAdmin (robot, username) {
@@ -98,10 +99,10 @@ module.exports = async (robot) => {
 
   /**
    * Checks if the specified date
-   * 1. follows the format stored in the DATE_FORMAT constant
+   * 1. follows the format stored in the DATE_FORMAT constant;
    * 2. is a valid date.
    *
-   * @param {string} date
+   * @param {string} date - Date to be validated.
    * @returns {boolean}
    */
   function isValidDate (date) {
