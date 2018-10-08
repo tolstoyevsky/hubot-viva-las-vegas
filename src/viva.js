@@ -34,7 +34,7 @@ module.exports = async (robot) => {
 
   const ANGRY_MESSAGE = 'Давай по порядку!'
 
-  const ACCESS_DENIED = 'У вас недостаточно прав для этой команды'
+  const ACCESS_DENIED = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
 
   const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*/)
 
@@ -56,7 +56,7 @@ module.exports = async (robot) => {
 
   const statesMessages = Object.freeze([
     '',
-    `C какого числа ты бы хотел уйти в отпуск? (${USER_FRIENDLY_DATE_FORMAT})`,
+    `C какого числа ты хочешь уйти в отпуск? (${USER_FRIENDLY_DATE_FORMAT})`,
     `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
     'Отправить текущую заявку в HR-отдел? (да/нет)'
   ])
@@ -177,7 +177,7 @@ module.exports = async (robot) => {
           delete state.leaveEnd
           delete state.requestStatus
 
-          robot.adapter.sendDirect({ user: { name: user.name } }, 'С возвращением из отпуска')
+          robot.adapter.sendDirect({ user: { name: user.name } }, 'С возвращением из отпуска!')
         }
       }
     }
@@ -187,7 +187,26 @@ module.exports = async (robot) => {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
     if (state.n !== undefined && state.n !== INIT_STATE) {
-      msg.send(`${ANGRY_MESSAGE}\n${statesMessages[state.n]}`)
+      const leaveStart = state.leaveStart
+      const leaveEnd = state.leaveEnd
+      let infoMessage
+
+      switch (state.n) {
+        case 1: {
+          infoMessage = '\n'
+          break
+        }
+        case 2: {
+          infoMessage = `\nИтак, ты хочешь в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')}.\n`
+          break
+        }
+        case 3: {
+          infoMessage = `\nИтак, ты хочешь уйти в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')} по ${moment(`${leaveEnd.day}.${leaveEnd.month}`, DATE_FORMAT).format('DD.MM')}.\n`
+          break
+        }
+      }
+
+      msg.send(`${ANGRY_MESSAGE}${infoMessage}${statesMessages[state.n]}`)
 
       return
     }
@@ -317,13 +336,13 @@ module.exports = async (robot) => {
       delete state.requestStatus
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}`)
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
       }
 
-      robot.adapter.sendDirect({ user: { name: username } }, 'Ваша заявка на отпуск отменена')
-      msg.send(`Отпуск пользователя @${username} отменен`)
+      robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
+      msg.send(`Отпуск пользователя @${username} отменен.`)
     } else {
-      msg.send('Этот человек не собирается в отпуск')
+      msg.send('Этот человек не собирается в отпуск.')
     }
   })
   robot.respond(/(одобрить|отклонить) заявку @?(.+)\s*/i, async (msg) => {
@@ -358,7 +377,7 @@ module.exports = async (robot) => {
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
         const admin = msg.message.user.name
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Заявка на отпуск пользователя @${username} была ${result} пользователем @${admin}`)
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Заявка на отпуск пользователя @${username} была ${result} пользователем @${admin}.`)
       }
 
       msg.send(`Заявка @${username} ${result}. Я отправлю ему уведомление об этом.`)
