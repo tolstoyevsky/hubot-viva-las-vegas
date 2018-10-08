@@ -345,7 +345,7 @@ module.exports = async (robot) => {
 
     const isRequestStatus = state.requestStatus && state.requestStatus !== READY_TO_APPLY_STATUS
 
-    if (isRequestStatus) {
+    if (state.requestStatus === APPROVED_STATUS) {
       state.n = INIT_STATE
       delete state.leaveStart
       delete state.leaveEnd
@@ -357,6 +357,8 @@ module.exports = async (robot) => {
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
       msg.send(`Отпуск пользователя @${username} отменен.`)
+    } else if (isRequestStatus) {
+      msg.send('Отменить можно только одобренные заявки. Используй команду \'отклонить\'.')
     } else {
       msg.send('Этот человек не собирается в отпуск.')
     }
