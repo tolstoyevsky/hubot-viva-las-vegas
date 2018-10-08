@@ -64,6 +64,16 @@ module.exports = async (robot) => {
     'Отправить текущую заявку в HR-отдел? (да/нет)'
   ])
 
+  /**
+   * Check if user has warned the customer.
+   *
+   * @param {Boolean} status - If user has warned the customer or not.
+   * @returns {String}
+   */
+  function isReport (status) {
+    return status ? 'в курсе. :white_check_mark:' : 'не предупрежден. :x:'
+  }
+
   function checkIfUserExists (robot, username) {
     const users = robot.brain.data.users
     const usernames = Object.values(users).map(user => user.name)
@@ -151,6 +161,63 @@ module.exports = async (robot) => {
           robot.adapter.sendDirect({ user: { name: user.name } }, 'С возвращением из отпуска!')
         }
       }
+    }
+  }
+
+  /**
+   * Send reminder one day before vacation if the user have not warned the customer.
+   *
+   * @param {Robot} robot - Hubot instance.
+   */
+  function checkIfNotReported (robot) {
+    const users = Object.values(robot.brain.data.users)
+    const tomorrow = moment().add(1, 'day')
+
+    for (const user of users) {
+      const vivaLasVegas = user.vivaLasVegas
+      if (!vivaLasVegas || vivaLasVegas.requestStatus !== APPROVED_STATUS) {
+        continue
+      }
+      const leaveStart = moment(user.leaveStart)
+
+      if (isEqualMonthDay(leaveStart, tomorrow)) {
+        const message = `${user.name} завтра уходит в отпуск. Заказчик ${isReport(vivaLasVegas.reportToCustomer)}.`
+
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message)
+      }
+    }
+  }
+
+  /**
+   * Send reminders of the upcoming vacation to HR channel.
+   *
+   * @param {Robot} robot - Hubot instance.
+   * @param {Number} amount - Amount of days before requested vacation's start.
+   */
+  function checkLeaveTimeLeft (robot, amount) {
+    const users = Object.values(robot.brain.data.users)
+    const currentDay = moment().add(amount, 'days')
+
+    let message = []
+
+    for (const user of users) {
+      const obj = user.vivaLasVegas.leaveStart
+      if (!obj) {
+        continue
+      }
+      const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
+      if (user.vivaLasVegas.requestStatus === APPROVED_STATUS && isEqualMonthDay(currentDay, leaveStart)) {
+        message.push(` @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${isReport(user.vivaLasVegas.reportToCustomer)}`)
+
+        if (!user.vivaLasVegas.reportToCustomer) {
+          const question = `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден? (да/нет)`
+          robot.adapter.sendDirect({ user: { name: user.name } }, question)
+        }
+      }
+    }
+
+    if (message.length) {
+      robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message.join('\n'))
     }
   }
 
@@ -281,10 +348,9 @@ module.exports = async (robot) => {
   robot.respond(/(да|нет)\s*/i, function (msg) {
     const username = msg.message.user.name
     const state = getStateFromBrain(robot, username)
+    const answer = msg.match[1].toLowerCase()
 
     if (state.n === CONFIRM_STATE) {
-      const answer = msg.match[1].toLowerCase()
-
       if (answer === 'да') {
         const deadline = moment(state.creationDate, CREATION_DATE_FORMAT).add(MAXIMUM_LENGTH_OF_WAIT, 'days').format('DD.MM')
         const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M').format('DD.MM')
@@ -293,6 +359,7 @@ module.exports = async (robot) => {
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${username} хочет в отпуск с ${from} по ${to}. Ответ нужно дать до ${deadline}.`)
 
         state.requestStatus = PENDING_STATUS
+        state.reportToCustomer = false
 
         msg.send(`Заявка на отпуск отправлена. Ответ поступит не позже чем через ${noname(MAXIMUM_LENGTH_OF_WAIT)}.`)
       } else {
@@ -300,6 +367,14 @@ module.exports = async (robot) => {
       }
 
       state.n = INIT_STATE
+    } else if (!state.reportToCustomer) {
+      if (answer === 'да') {
+        state.reportToCustomer = true
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${username} только что сообщил, что предупредил заказчика о своем отпуске.`)
+        msg.send(':thumbsup:')
+      } else {
+        msg.send('Обязательно предупреди! :fearful:')
+      }
     }
   })
 
@@ -458,5 +533,9 @@ module.exports = async (robot) => {
     schedule.scheduleJob(REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
 
     schedule.scheduleJob(REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
+
+    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 30))
+    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14))
+    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkIfNotReported(robot))
   }
 }
