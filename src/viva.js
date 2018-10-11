@@ -11,6 +11,7 @@
 //   hubot одобрить заявку @username - approves the leave request for the specified user (privileged: admins only)
 //   hubot отклонить заявку @username - rejects the leave request for the specified user (privileged: admins only)
 //   hubot отменить заявку @username - cancels the approved leave request for the specified user (privileged: admins only)
+//   hubot список заявок - prints the list of leave requests both awaiting approval and already approved (privileged: admins only)
 //
 
 module.exports = async (robot) => {
@@ -403,6 +404,54 @@ module.exports = async (robot) => {
     }
 
     msg.send(DONE_MSG)
+  })
+
+  robot.respond(/список заявок\s*/i, async msg => {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
+      msg.send(ACCESS_DENIED_MSG)
+      return
+    }
+
+    const users = Object.values(robot.brain.data.users)
+
+    const formatLine = user => {
+      const username = user.name
+      const from = user.vivaLasVegas.leaveStart
+      const to = user.vivaLasVegas.leaveEnd
+
+      const formattedDate =
+        moment(`${from.day}.${from.month}.${from.year}`, 'D.M.YYYY').format('DD.MM.YYYY') +
+        ' - ' +
+        moment(`${to.day}.${to.month}.${to.year}`, 'D.M.YYYY').format('DD.MM.YYYY')
+
+      return ` @${username} ${formattedDate}`
+    }
+
+    const sorting = (a, b, format) => {
+      const first = moment(a, format)
+      const second = moment(b, format)
+
+      return first.unix() - second.unix()
+    }
+
+    const approved = users
+      .filter(user => user.vivaLasVegas && user.vivaLasVegas.requestStatus === APPROVED_STATUS)
+      .sort((a, b) => sorting(a.vivaLasVegas.leaveStart, b.vivaLasVegas.leaveStart, ''))
+      .map(formatLine)
+      .join('\n')
+    const pending = users
+      .filter(user => user.vivaLasVegas && user.vivaLasVegas.requestStatus === PENDING_STATUS)
+      .sort((a, b) => sorting(a.vivaLasVegas.leaveStart, b.vivaLasVegas.leaveStart, ''))
+      .map(formatLine)
+      .join('\n')
+
+    const result = []
+
+    if (approved) result.push(`*Одобренные заявки:*\n ${approved}`)
+    if (pending) result.push(`*Ожидающие подтверждения:*\n ${pending}`)
+    if (!result.length) result.push('Никто не собирается в отпуск.')
+
+    msg.send(result.join('\n'))
   })
 
   if (REMINDER_SCHEDULER) {
