@@ -2,7 +2,7 @@
 //   A Hubot script which helps users to create leave requests.
 //
 // Configuration:
-//   LEAVE_COORDINATION_CHANNEL - ...
+//   LEAVE_COORDINATION_CHANNEL - The channel name to handle users leave requests
 //   MAXIMUM_LENGTH_OF_LEAVE - The maximum number of days an employee is allowed to be on leave
 //   MAXIMUM_LENGTH_OF_WAIT - The maximum number of days each request may take
 //
@@ -32,9 +32,10 @@ module.exports = async (robot) => {
   const PENDING_STATUS = 'pending'
   const READY_TO_APPLY_STATUS = 'ready-to-apply'
 
-  const ANGRY_MESSAGE = 'Давай по порядку!'
-
-  const ACCESS_DENIED = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
+  const ANGRY_MSG = 'Давай по порядку!'
+  const ACCESS_DENIED_MSG = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
+  const DONE_MSG = 'Готово!'
+  const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
 
   const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*/)
 
@@ -158,7 +159,8 @@ module.exports = async (robot) => {
 
   /**
    * Reset the leave status of the users if their vacation is over.
-   * @param {Robot} robot Hubot instance
+   *
+   * @param {Robot} robot - Hubot instance.
    * @returns {Void}
    */
   function resetLeaveStatus (robot) {
@@ -206,7 +208,7 @@ module.exports = async (robot) => {
         }
       }
 
-      msg.send(`${ANGRY_MESSAGE}${infoMessage}${statesMessages[state.n]}`)
+      msg.send(`${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`)
 
       return
     }
@@ -236,7 +238,7 @@ module.exports = async (robot) => {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
     if (!isValidDate(date)) {
-      msg.send(`Указанная дата является невалидной. Попробуй еще раз.`)
+      msg.send(INVALID_DATE_MSG)
 
       return
     }
@@ -319,7 +321,7 @@ module.exports = async (robot) => {
         const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M').format('DD.MM')
         const to = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M').format('DD.MM')
 
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${username} хочет в отпуск с ${from} по ${to}. Ответ нужно дать до ${deadline}.`)
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${username} хочет в отпуск с ${from} по ${to}. Ответ нужно дать до ${deadline}.`)
 
         state.requestStatus = PENDING_STATUS
 
@@ -334,7 +336,7 @@ module.exports = async (robot) => {
 
   robot.respond(/(отменить заявку @?(.+))\s*/i, async (msg) => {
     if (!await isAdmin(robot, msg.message.user.name)) {
-      msg.send(ACCESS_DENIED)
+      msg.send(ACCESS_DENIED_MSG)
       return
     }
 
@@ -350,7 +352,7 @@ module.exports = async (robot) => {
       delete state.requestStatus
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `@${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
       }
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
@@ -364,7 +366,7 @@ module.exports = async (robot) => {
     const username = msg.match[2].trim()
 
     if (!await isAdmin(robot, msg.message.user.name)) {
-      msg.send(ACCESS_DENIED)
+      msg.send(ACCESS_DENIED_MSG)
       return
     }
 
@@ -403,12 +405,13 @@ module.exports = async (robot) => {
   })
 
   /**
-   * Overwrites vacation ending date
-   * @example viva reset @username DD.MM
+   * Overwrites vacation ending date.
+   *
+   * @example viva reset @username DD.MM.
    */
   robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}))\s*/i, async (msg) => {
     if (!await isAdmin(robot, msg.message.user.name)) {
-      msg.send(ACCESS_DENIED)
+      msg.send(ACCESS_DENIED_MSG)
       return
     }
 
@@ -416,7 +419,7 @@ module.exports = async (robot) => {
     const dateMonth = msg.match[3]
 
     if (!isValidDate(dateMonth)) {
-      msg.send('Invalid date')
+      msg.send(INVALID_DATE_MSG)
 
       return
     }
@@ -429,7 +432,7 @@ module.exports = async (robot) => {
       year: moment().year()
     }
 
-    msg.send('ok')
+    msg.send(DONE_MSG)
   })
 
   if (REMINDER_SCHEDULER) {
