@@ -30,3 +30,9 @@ See [AUTHORS](AUTHORS.md).
 ## Licensing
 
 hubot-viva-las-vegas is available under the [Apache License, Version 2.0](LICENSE).
+
+## Debug
+
+| Command                             | Description | Parameters |
+|-------------------------------------|-------------|------------|
+| `viva reset @%username% %date%` | If you want to test the user's vacation end, you can specify the date via this command| `username` - current user, <br/> `date` - vacation's end day in the "DD.MM" format |
