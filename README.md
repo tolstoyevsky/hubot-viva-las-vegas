@@ -32,7 +32,7 @@ The script can be configured via the following environment variables (called par
 | `LEAVE_COORDINATION_CHANNEL`  | The channel name intended for handling users leave requests. The bot **must be** in the channel (see the [Prerequisites](#prerequisites) sections). It's highly recommended to invite HRs, Teach Leads and Team Leads to the channels to make the whole process transparent. | leave-coordination |
 | `MAXIMUM_LENGTH_OF_LEAVE`     | The maximum number of days an employee is allowed to be on leave. | 28 |
 | `MAXIMUM_LENGTH_OF_WAIT`      | The maximum number of days handling of each request may take. | 7 |
-| `MINIMUM_DAYS_BEFORE_REQUEST` | The minimum number of days before the target date an employee is allowed to apply for a leave. | 14 |
+| `MINIMUM_DAYS_BEFORE_REQUEST` | The minimum number of days before the target date an employee is allowed to apply for a leave. | 7 |
 | `REMINDER_SCHEDULER`          | Allows specifying the frequency with which the script checks if some of the users are awaiting a reply or back after leave. If the check succeeds, the script sends reminders (either to the channel specified via `LEAVE_COORDINATION_CHANNEL` or directly to users, depending on the particular reminder). The value of this parameter must follow the [Cron Format](https://github.com/node-schedule/node-schedule#cron-style-scheduling). | `0 0 7 * * *` |
 
 ## Example Interaction
