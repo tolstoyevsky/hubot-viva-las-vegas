@@ -282,7 +282,7 @@ module.exports = async (robot) => {
     const state = getStateFromBrain(robot, username)
 
     if (state.n === CONFIRM_STATE) {
-      const answer = msg.match[1]
+      const answer = msg.match[1].toLowerCase()
 
       if (answer === 'да') {
         const deadline = moment(state.creationDate, CREATION_DATE_FORMAT).add(MAXIMUM_LENGTH_OF_WAIT, 'days').format('DD.MM')
