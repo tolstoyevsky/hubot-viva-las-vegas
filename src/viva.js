@@ -189,7 +189,7 @@ module.exports = async (robot) => {
     }
 
     if (state.requestStatus === PENDING_STATUS) {
-      msg.send('Ты уже отправил заявку на отпуск. Дождись ответа.')
+      msg.send('Твоя заявка на отпуск уже отправлена. Дождись ответа.')
 
       return
     }
@@ -367,7 +367,7 @@ module.exports = async (robot) => {
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Заявка на отпуск пользователя @${username} была ${result} пользователем @${admin}.`)
       }
 
-      msg.send(`Заявка @${username} ${result}. Я отправлю ему уведомление об этом.`)
+      msg.send(`Заявка @${username} ${result}. Я отправлю этому пользователю уведомление об этом.`)
 
       robot.adapter.sendDirect({ user: { name: username } }, `Заявка на отпуск ${result}.`)
     } else {
