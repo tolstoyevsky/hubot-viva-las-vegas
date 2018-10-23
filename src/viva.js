@@ -7,13 +7,17 @@
 //   MAXIMUM_LENGTH_OF_WAIT - The maximum number of days each request may take
 //
 // Commands:
-//   hubot хочу в отпуск - initiates a new leave request
-//   hubot работаю из дома - sets the status of work from home and adds the corresponding event to the calendar
-//   hubot не работаю из дома - removes work from home status and deletes the corresponding event from the calendar
-//   hubot одобрить заявку @username - approves the leave request for the specified user (privileged: admins only)
-//   hubot отклонить заявку @username - rejects the leave request for the specified user (privileged: admins only)
-//   hubot отменить заявку @username - cancels the approved leave request for the specified user (privileged: admins only)
-//   hubot список заявок - prints the list of leave requests both awaiting approval and already approved (privileged: admins only)
+//  begin group Viva Las Vegas
+//    hubot работаю из дома - sets the status of work from home and adds the corresponding event to the calendar
+//    hubot не работаю из дома - removes work from home status and deletes the corresponding event from the calendar
+//    hubot хочу в отпуск - initiates a new leave request
+//    begin admin
+//      hubot одобрить заявку @username - approves the leave request for the specified user
+//      hubot отклонить заявку @username - rejects the leave request for the specified user
+//      hubot отменить заявку @username - cancels the approved leave request for the specified user
+//      hubot список заявок - prints the list of leave requests both awaiting approval and already approved
+//    end admin
+//  end group
 //
 
 module.exports = async (robot) => {
