@@ -23,7 +23,7 @@ module.exports = async (robot) => {
   const MAXIMUM_LENGTH_OF_LEAVE = parseInt(process.env.MAXIMUM_LENGTH_OF_LEAVE, 10) || 28
   const MAXIMUM_LENGTH_OF_WAIT = parseInt(process.env.MAXIMUM_LENGTH_OF_WAIT, 10) || 7
   const MINIMUM_DAYS_BEFORE_REQUEST = parseInt(process.env.MINIMUM_DAYS_BEFORE_REQUEST, 10) || 7
-  const REMINDER_SCHEDULER = process.env.REMINDER_SCHEDULER || '0 0 7 * * *'
+  const VIVA_REMINDER_SCHEDULER = process.env.VIVA_REMINDER_SCHEDULER || '0 0 7 * * *'
 
   const INIT_STATE = 0
   const FROM_STATE = 1
@@ -529,13 +529,13 @@ module.exports = async (robot) => {
     msg.send(result.join('\n'))
   })
 
-  if (REMINDER_SCHEDULER) {
-    schedule.scheduleJob(REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
+  if (VIVA_REMINDER_SCHEDULER) {
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
 
-    schedule.scheduleJob(REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
 
-    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 30))
-    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14))
-    schedule.scheduleJob(REMINDER_SCHEDULER, () => checkIfNotReported(robot))
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 30))
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14))
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkIfNotReported(robot))
   }
 }
