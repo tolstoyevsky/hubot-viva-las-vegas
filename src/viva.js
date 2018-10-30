@@ -15,10 +15,15 @@
 //
 
 module.exports = async (robot) => {
+  const { google } = require('googleapis')
   const moment = require('moment')
   const routines = require('hubot-routines')
   const schedule = require('node-schedule')
 
+  const GOOGLE_API = process.env.GOOGLE_API === 'true' || false
+  const GOOGLE_CALENDAR_NAME = process.env.GOOGLE_CALENDAR_NAME || 'WIS Calendar'
+  const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL
+  const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.split('\\n').join('\n') : null
   const LEAVE_COORDINATION_CHANNEL = process.env.LEAVE_COORDINATION_CHANNEL || 'leave-coordination'
   const MAXIMUM_LENGTH_OF_LEAVE = parseInt(process.env.MAXIMUM_LENGTH_OF_LEAVE, 10) || 28
   const MAXIMUM_LENGTH_OF_WAIT = parseInt(process.env.MAXIMUM_LENGTH_OF_WAIT, 10) || 7
@@ -72,6 +77,79 @@ module.exports = async (robot) => {
    */
   function isReport (status) {
     return status ? 'в курсе. :white_check_mark:' : 'не предупрежден. :x:'
+  }
+
+  let GOOGLE_JWT_CLIENT
+  let GOOGLE_CALENDAR
+  let GOOGLE_CALENDAR_ID
+
+  /**
+   * Google auth.
+   *
+   * @param {Object} data - Google Service Account Data.
+   * @returns {Boolean}
+   */
+  async function googleAuth (data) {
+    const SCOPES = [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar'
+    ]
+
+    GOOGLE_JWT_CLIENT = new google.auth.JWT(
+      data.client_email,
+      null,
+      data.private_key,
+      SCOPES,
+      null
+    )
+
+    let result = true
+
+    await new Promise((resolve, reject) => {
+      GOOGLE_JWT_CLIENT.authorize((err, response) => {
+        if (err) {
+          reject(err)
+        }
+        resolve(response)
+      })
+    }).catch(() => {
+      result = false
+    })
+
+    return result
+  }
+
+  /**
+   * Get Google calendar id.
+   *
+   * @returns {Void | String} - Calendar id.
+   */
+  async function getCalendar () {
+    const result = await new Promise((resolve, reject) => {
+      GOOGLE_CALENDAR.calendarList.list((err, response) => {
+        if (err) {
+          reject(err)
+        }
+        resolve(response)
+      })
+    }).catch((err) => {
+      if (err) {
+        routines.rave(robot, 'Couldn\'t find the calendars list.')
+      }
+    })
+
+    if (!result.data.items.length) {
+      routines.rave(robot, 'There are no calendars.')
+      return
+    }
+
+    const calendars = result.data.items.filter(item => item.summary === GOOGLE_CALENDAR_NAME)
+    if (!calendars.length) {
+      routines.rave(robot, 'Couldn\'t find the calendar with the specified name.')
+      return
+    }
+
+    return calendars.shift().id
   }
 
   function checkIfUserExists (robot, username) {
@@ -163,6 +241,73 @@ module.exports = async (robot) => {
       }
     }
   }
+
+  /**
+   * Add a new event to the calendar.
+   *
+   * @param {String} start
+   * @param {String} end
+   * @param {Object} user
+  */
+  function addEventOfVacation (start, end, user) {
+    // Google API date format YYYY-MM-DD
+    let event = {
+      summary: `Отпуск (${user.name})`,
+      start: {
+        date: `${start}`
+      },
+      end: {
+        date: `${end}`
+      }
+    }
+    GOOGLE_CALENDAR.events.insert({
+      calendarId: GOOGLE_CALENDAR_ID,
+      resource: event
+    }, (err, response) => {
+      if (err) {
+        routines.rave(robot, 'An error occurred when attempting to add an event in the calendar.')
+        return
+      }
+      user.vivaLasVegas.eventId = response.data.id
+    })
+  }
+
+  function deletEventOfVacation (user) {
+    GOOGLE_CALENDAR.events.delete({
+      calendarId: GOOGLE_CALENDAR_ID,
+      eventId: user.vivaLasVegas.eventId
+    }, (err) => {
+      if (err) {
+        routines.rave(robot, 'An error occurred when attempting to delete an event in the calendar.')
+        return
+      }
+      delete user.vivaLasVegas.eventId
+    })
+  }
+
+  (async () => {
+    if (GOOGLE_API) {
+      if (GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY) {
+        const AUTH_TO_GOOGLE_API = {
+          private_key: GOOGLE_PRIVATE_KEY,
+          client_email: GOOGLE_CLIENT_EMAIL
+        }
+
+        if (await googleAuth(AUTH_TO_GOOGLE_API)) {
+          GOOGLE_CALENDAR = await google.calendar({ auth: GOOGLE_JWT_CLIENT, version: 'v3' })
+
+          GOOGLE_CALENDAR_ID = await getCalendar()
+          if (!GOOGLE_CALENDAR_ID) {
+            return void 0
+          }
+        } else {
+          routines.rave(robot, 'Couldn\'t be authenticated.')
+        }
+      } else {
+        routines.rave(robot, 'The params related to Google Calendar API wasn\'t specified.')
+      }
+    }
+  })()
 
   /**
    * Send reminder one day before vacation if the user have not warned the customer.
@@ -385,6 +530,7 @@ module.exports = async (robot) => {
     }
 
     const username = msg.match[2].trim()
+    const user = robot.brain.userForName(username)
     const state = getStateFromBrain(robot, username)
 
     const isRequestStatus = state.requestStatus && state.requestStatus !== READY_TO_APPLY_STATUS
@@ -397,6 +543,10 @@ module.exports = async (robot) => {
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
+      }
+
+      if (GOOGLE_API && user.vivaLasVegas.eventId) {
+        deletEventOfVacation(user)
       }
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
@@ -418,6 +568,7 @@ module.exports = async (robot) => {
 
     if (checkIfUserExists(robot, username)) {
       const state = getStateFromBrain(robot, username)
+      const user = robot.brain.userForName(username)
       let requestStatus
       let result
 
@@ -430,6 +581,22 @@ module.exports = async (robot) => {
       if (action === 'одобрить') {
         result = 'одобрена'
         requestStatus = APPROVED_STATUS
+
+        const start = state.leaveStart
+        const leaveStart = moment(
+          `${start.day}.${start.month}.${start.year}`,
+          'DD.MM.YYYY'
+        ).format('YYYY-MM-DD')
+
+        const end = state.leaveEnd
+        const leaveEnd = moment(
+          `${end.day}.${end.month}.${end.year}`,
+          'DD.MM.YYYY'
+        ).add(1, 'day').format('YYYY-MM-DD')
+
+        if (GOOGLE_API) {
+          addEventOfVacation(leaveStart, leaveEnd, user)
+        }
       } else {
         result = 'отклонена'
         requestStatus = READY_TO_APPLY_STATUS
