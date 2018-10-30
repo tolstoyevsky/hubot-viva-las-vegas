@@ -29,6 +29,10 @@ The script can be configured via the following environment variables (called par
 
 | Parameter                     | Description | Default |
 |-------------------------------|-------------|---------|
+| `GOOGLE_API`                  | Specifies whether to create events in Google Calendar using Google API. It can be useful when it's necessary to reflect the employees leave in the calendar. | false |
+| `GOOGLE_CALENDAR_NAME`        | Google Calendar name related to the [Service account](https://cloud.google.com/iam/docs/service-accounts). | WIS Calendar |
+| `GOOGLE_CLIENT_EMAIL`         | Username of the the [Service account](https://cloud.google.com/iam/docs/service-accounts). The parameter is **mandatory** if `GOOGLE_API` is set to `true`. | |
+| `GOOGLE_PRIVATE_KEY`          | The value of the `private_key` attribute located in the file [created by GCP Console](https://cloud.google.com/iam/docs/creating-managing-service-account-keys). The parameter is **mandatory** if `GOOGLE_API` is set to `true`. | |
 | `LEAVE_COORDINATION_CHANNEL`  | The channel name intended for handling users leave requests. The bot **must be** in the channel (see the [Prerequisites](#prerequisites) sections). It's highly recommended to invite HRs, Teach Leads and Team Leads to the channels to make the whole process transparent. | leave-coordination |
 | `MAXIMUM_LENGTH_OF_LEAVE`     | The maximum number of days an employee is allowed to be on leave. | 28 |
 | `MAXIMUM_LENGTH_OF_WAIT`      | The maximum number of days handling of each request may take. | 7 |
