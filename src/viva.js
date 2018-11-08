@@ -39,7 +39,7 @@ module.exports = async (robot) => {
   const DONE_MSG = 'Готово!'
   const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
 
-  const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*/)
+  const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*$/)
 
   // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
   const botChannels = await robot.adapter.api.get('channels.list.joined')
@@ -273,7 +273,7 @@ module.exports = async (robot) => {
     const month = parseInt(msg.match[3])
     const state = getStateFromBrain(robot, msg.message.user.name)
 
-    if (!routines.isValidDate(date, DATE_FORMAT)) {
+    if ([FROM_STATE, TO_STATE].includes(state.n) && !routines.isValidDate(date, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
 
       return
