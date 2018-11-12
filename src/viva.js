@@ -269,9 +269,10 @@ module.exports = async (robot) => {
 
   robot.respond(regExpMonthYear, function (msg) {
     const date = msg.match[1]
-    const day = parseInt(msg.match[2])
-    const month = parseInt(msg.match[3])
     const state = getStateFromBrain(robot, msg.message.user.name)
+
+    let day = parseInt(msg.match[2])
+    let month = parseInt(msg.match[3])
 
     if ([FROM_STATE, TO_STATE].includes(state.n) && !routines.isValidDate(date, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
@@ -323,9 +324,24 @@ module.exports = async (robot) => {
     if (state.n === TO_STATE) {
       const leaveStart = state.leaveStart
       const leaveEnd = {}
-      const year = leaveStart.month >= month && leaveStart.day >= day ? leaveStart.year + 1 : leaveStart.year
+
+      let year = leaveStart.month >= month && leaveStart.day >= day ? leaveStart.year + 1 : leaveStart.year
+
       const d1 = moment(`${leaveStart.day}.${leaveStart.month}.${leaveStart.year}`, 'D.M.YYYY')
       const d2 = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
+
+      let withWeekends = ''
+
+      if (d2.day() >= 5) {
+        d2.day(7)
+
+        day = d2.date()
+        month = d2.month()
+        year = d2.year()
+
+        withWeekends = ' (учитывая выходные)'
+      }
+
       const daysNumber = d2.diff(d1, 'days')
 
       if (daysNumber > MAXIMUM_LENGTH_OF_LEAVE) {
@@ -341,7 +357,7 @@ module.exports = async (robot) => {
       state.leaveEnd = leaveEnd
       state.n = CONFIRM_STATE
 
-      msg.send(`Значит ты планируешь находиться в отпуске ${noname(daysNumber)}. Все верно? (да/нет)`)
+      msg.send(`Значит ты планируешь находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно? (да/нет)`)
     }
   })
 
