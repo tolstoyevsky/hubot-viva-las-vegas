@@ -448,7 +448,8 @@ module.exports = async (robot) => {
 
       if (daysBefore < MINIMUM_DAYS_BEFORE_REQUEST) {
         const minDate = today.add(MINIMUM_DAYS_BEFORE_REQUEST, 'd').format('DD.MM.YYYY')
-        msg.send(`Нужно запрашивать отпуск минимум за ${noname(MINIMUM_DAYS_BEFORE_REQUEST)}, а до твоего - только ${noname(daysBefore)}. Попробуй выбрать дату позднее ${minDate}.`)
+        const duration = daysBefore ? `только через ${noname(daysBefore)}` : `уже завтра`
+        msg.send(`Нужно запрашивать отпуск минимум за ${noname(MINIMUM_DAYS_BEFORE_REQUEST)}, а твой - ${duration}. Попробуй выбрать дату позднее ${minDate}.`)
         return
       }
 
