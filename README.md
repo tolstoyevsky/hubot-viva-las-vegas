@@ -58,11 +58,11 @@ The following command is
 * for admin use only.
 
 ```
-some.user >> hubot reset @user.name 15.10
+some.user >> hubot viva reset @user.name 15.10
     hubot >> Готово!
 ```
 
-In this case the leave end of the user named `user.name` was changed to `15.11` (October 15). It allows simulating returning from leave.
+In this case the leave end of the user named `user.name` was changed to `15.10` (October 15). It allows simulating returning from leave.
 
 
 ## Authors
