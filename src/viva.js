@@ -482,7 +482,7 @@ module.exports = async (robot) => {
         d2.day(7)
 
         day = d2.date()
-        month = d2.month()
+        month = d2.month() + 1
         year = d2.year()
 
         withWeekends = ' (учитывая выходные)'
