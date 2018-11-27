@@ -91,10 +91,10 @@ module.exports = async (robot) => {
    * Check if user has warned the customer.
    *
    * @param {Boolean} status - If user has warned the customer or not.
-   * @returns {String}
+   * @returns {Array}
    */
   function isReport (status) {
-    return status ? 'в курсе. :white_check_mark:' : 'не предупрежден. :x:'
+    return status ? [':white_check_mark:', 'в курсе.'] : [':x:', 'не предупрежден.']
   }
 
   let GOOGLE_JWT_CLIENT
@@ -342,49 +342,36 @@ module.exports = async (robot) => {
   })()
 
   /**
-   * Send reminder one day before vacation if the user have not warned the customer.
-   *
-   * @param {Robot} robot - Hubot instance.
-   */
-  function checkIfNotReported (robot) {
-    const users = Object.values(robot.brain.data.users)
-    const tomorrow = moment().add(1, 'day')
-
-    for (const user of users) {
-      const vivaLasVegas = user.vivaLasVegas
-      if (!vivaLasVegas || vivaLasVegas.requestStatus !== APPROVED_STATUS) {
-        continue
-      }
-      const leaveStart = moment(user.leaveStart)
-
-      if (isEqualMonthDay(leaveStart, tomorrow)) {
-        const message = `${user.name} завтра уходит в отпуск. Заказчик ${isReport(vivaLasVegas.reportToCustomer)}.`
-
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message)
-      }
-    }
-  }
-
-  /**
    * Send reminders of the upcoming vacation to HR channel.
    *
    * @param {Robot} robot - Hubot instance.
-   * @param {Number} amount - Amount of days before requested vacation's start.
    */
-  function checkLeaveTimeLeft (robot, amount) {
+  async function checkLeaveTimeLeft (robot) {
     const users = Object.values(robot.brain.data.users)
-    const currentDay = moment().add(amount, 'days')
+    const sortedUsers = users
+      .filter(users => users.vivaLasVegas.leaveStart && users.vivaLasVegas.requestStatus === APPROVED_STATUS)
+      .sort((a, b) => sortingByValue(a.vivaLasVegas, b.vivaLasVegas, 'DD.MM.YYYY'))
+      .sort((a, b) => sortingByStatus(a.vivaLasVegas, b.vivaLasVegas))
 
     let message = []
 
-    for (const user of users) {
-      if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
+    for (const user of sortedUsers) {
+      if (await routines.isUserActive(robot, user)) {
         const obj = user.vivaLasVegas.leaveStart
+        const reportStatus = user.vivaLasVegas.reportToCustomer
         const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
-        if (user.vivaLasVegas.requestStatus === APPROVED_STATUS && isEqualMonthDay(currentDay, leaveStart)) {
-          message.push(` @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${isReport(user.vivaLasVegas.reportToCustomer)}`)
+        const amount = moment(leaveStart.diff(moment())).format('D')
+        const days = Object.values(arguments).slice(1)
+        const currentDay = days.indexOf(parseInt(amount)) >= 0
 
-          if (!user.vivaLasVegas.reportToCustomer) {
+        if (currentDay) {
+          if ((amount === '1' && !reportStatus) || amount !== '1') {
+            const emoji = isReport(reportStatus)[0]
+            const status = isReport(reportStatus)[1]
+            message.push(`${emoji} @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${status}`)
+          }
+
+          if (!reportStatus) {
             const question = routines.buildMessageWithButtons(
               `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден?`,
               [
@@ -485,6 +472,21 @@ module.exports = async (robot) => {
       const today = `*Сегодня:*\n`
       robot.messageRoom('general', today + message.join('\n'))
     }
+  }
+
+  function sortingByValue (a, b, format) {
+    const firstDate = moment(`${a.leaveStart.day}.${a.leaveStart.month}.${a.leaveStart.year}`, format).format(format)
+    const secondDate = moment(`${b.leaveStart.day}.${b.leaveStart.month}.${b.leaveStart.year}`, format).format(format)
+
+    let first = moment(firstDate, format).unix()
+    let second = moment(secondDate, format).unix()
+
+    return first - second
+  }
+
+  function sortingByStatus (a, b) {
+    if (!a.reportToCustomer && b.reportToCustomer) return -1
+    if (a.reportToCustomer && !b.reportToCustomer) return 1
   }
 
   robot.respond(/хочу в отпуск\s*/i, function (msg) {
@@ -1014,9 +1016,7 @@ module.exports = async (robot) => {
 
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
 
-    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 30))
-    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14))
-    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkIfNotReported(robot))
+    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14, 30, 1))
 
     schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => prepareDailyReport(robot))
   }
