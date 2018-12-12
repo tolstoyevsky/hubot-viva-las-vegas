@@ -8,6 +8,8 @@
 //
 // Commands:
 //   hubot хочу в отпуск - initiates a new leave request
+//   hubot работаю из дома - sets the status of work from home and adds the corresponding event to the calendar
+//   hubot не работаю из дома - removes work from home status and deletes the corresponding event from the calendar
 //   hubot одобрить заявку @username - approves the leave request for the specified user (privileged: admins only)
 //   hubot отклонить заявку @username - rejects the leave request for the specified user (privileged: admins only)
 //   hubot отменить заявку @username - cancels the approved leave request for the specified user (privileged: admins only)
@@ -21,6 +23,8 @@ module.exports = async (robot) => {
   const schedule = require('node-schedule')
 
   const GOOGLE_API = process.env.GOOGLE_API === 'true' || false
+  const GOOGLE_EVENT_VACATION = 'Отпуск'
+  const GOOGLE_EVENT_WORK_FROM_HOME = 'Работа из дома'
   const GOOGLE_CALENDAR_NAME = process.env.GOOGLE_CALENDAR_NAME || 'WIS Calendar'
   const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL
   const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.split('\\n').join('\n') : null
@@ -34,6 +38,8 @@ module.exports = async (robot) => {
   const FROM_STATE = 1
   const TO_STATE = 2
   const CONFIRM_STATE = 3
+  const WAITING_DATE_STATE = 4
+  const WAITING_CONFIRMATION_STATE = 5
 
   const APPROVED_STATUS = 'approved'
   const PENDING_STATUS = 'pending'
@@ -44,7 +50,7 @@ module.exports = async (robot) => {
   const DONE_MSG = 'Готово!'
   const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
 
-  const regExpMonthYear = new RegExp(/((\d{1,2})\.(\d{1,2}))\s*$/)
+  const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/)
 
   // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
   const botChannels = await robot.adapter.api.get('channels.list.joined')
@@ -59,6 +65,7 @@ module.exports = async (robot) => {
   // Here is the format string which is suitable for the following cases: DD.MM, D.M
   // See https://momentjs.com/docs/#/parsing/string-format/ for details.
   const DATE_FORMAT = 'D.M'
+  const OUTPUT_DATE_FORMAT = 'DD.MM'
   const USER_FRIENDLY_DATE_FORMAT = 'дд.мм'
   const CREATION_DATE_FORMAT = 'DD.MM.YYYY'
 
@@ -68,6 +75,17 @@ module.exports = async (robot) => {
     `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
     'Отправить текущую заявку в HR-отдел? (да/нет)'
   ])
+
+  const { Stack } = require('./stack')
+
+  let users = Object.values(robot.brain.data.users)
+
+  users.forEach(user => {
+    if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome && typeof user.vivaLasVegas.dateOfWorkFromHome === 'string') {
+      user.vivaLasVegas.dateOfWorkFromHome = [(user.vivaLasVegas.dateOfWorkFromHome), user.vivaLasVegas.dateOfWorkFromHome]
+      console.log('*')
+    }
+  })
 
   /**
    * Check if user has warned the customer.
@@ -249,10 +267,10 @@ module.exports = async (robot) => {
    * @param {String} end
    * @param {Object} user
   */
-  function addEventOfVacation (start, end, user) {
+  async function addEventToCalendar (start, end, user, type) {
     // Google API date format YYYY-MM-DD
     let event = {
-      summary: `Отпуск (${user.name})`,
+      summary: `${type} (${user.name})`,
       start: {
         date: `${start}`
       },
@@ -260,28 +278,42 @@ module.exports = async (robot) => {
         date: `${end}`
       }
     }
-    GOOGLE_CALENDAR.events.insert({
-      calendarId: GOOGLE_CALENDAR_ID,
-      resource: event
-    }, (err, response) => {
-      if (err) {
-        routines.rave(robot, 'An error occurred when attempting to add an event in the calendar.')
-        return
-      }
-      user.vivaLasVegas.eventId = response.data.id
+
+    const result = await new Promise((resolve, reject) => {
+      GOOGLE_CALENDAR.events.insert({
+        calendarId: GOOGLE_CALENDAR_ID,
+        resource: event
+      }, (err, response) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve(response)
+        }
+      })
+    }).catch(() => {
+      routines.rave(robot, 'An error occurred when attempting to add an event to the calendar.')
     })
+
+    if (result) {
+      return result.data.id
+    } else {
+      return false
+    }
   }
 
-  function deletEventOfVacation (user) {
+  /**
+   * Delete the event from the calendar by id.
+   *
+   * @param {string} eventId - Event id.
+   */
+  function deleteEventFromCalendar (eventId) {
     GOOGLE_CALENDAR.events.delete({
       calendarId: GOOGLE_CALENDAR_ID,
-      eventId: user.vivaLasVegas.eventId
+      eventId: eventId
     }, (err) => {
       if (err) {
-        routines.rave(robot, 'An error occurred when attempting to delete an event in the calendar.')
-        return
+        routines.rave(robot, 'An error occurred when attempting to delete an event from the calendar.')
       }
-      delete user.vivaLasVegas.eventId
     })
   }
 
@@ -346,17 +378,16 @@ module.exports = async (robot) => {
     let message = []
 
     for (const user of users) {
-      const obj = user.vivaLasVegas.leaveStart
-      if (!obj) {
-        continue
-      }
-      const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
-      if (user.vivaLasVegas.requestStatus === APPROVED_STATUS && isEqualMonthDay(currentDay, leaveStart)) {
-        message.push(` @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${isReport(user.vivaLasVegas.reportToCustomer)}`)
+      if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
+        const obj = user.vivaLasVegas.leaveStart
+        const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
+        if (user.vivaLasVegas.requestStatus === APPROVED_STATUS && isEqualMonthDay(currentDay, leaveStart)) {
+          message.push(` @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${isReport(user.vivaLasVegas.reportToCustomer)}`)
 
-        if (!user.vivaLasVegas.reportToCustomer) {
-          const question = `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден? (да/нет)`
-          robot.adapter.sendDirect({ user: { name: user.name } }, question)
+          if (!user.vivaLasVegas.reportToCustomer) {
+            const question = `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден? (да/нет)`
+            robot.adapter.sendDirect({ user: { name: user.name } }, question)
+          }
         }
       }
     }
@@ -364,6 +395,33 @@ module.exports = async (robot) => {
     if (message.length) {
       robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message.join('\n'))
     }
+  }
+
+  /**
+   * Transform such adverbs as 'завтра' and 'сегодня' into a specific date according
+   * to the specified date format.
+   *
+   * @param {string} adverb - Adverb to be transformed.
+   * @param {string} format - Date format.
+   *
+   * @returns {boolean | string}
+   */
+  function adverbToDate (adverb, format) {
+    let day = moment()
+    let date
+    let month
+
+    if (adverb === 'сегодня') {
+      return day.format(format)
+    }
+
+    if (adverb === 'завтра') {
+      date = moment(day, DATE_FORMAT).date() + 1
+      month = moment(day, DATE_FORMAT).month() + 1
+      return moment(`${date}.${month}`, DATE_FORMAT).format(format)
+    }
+
+    return false
   }
 
   robot.respond(/хочу в отпуск\s*/i, function (msg) {
@@ -412,12 +470,49 @@ module.exports = async (robot) => {
     msg.send(`Ok, с какого числа? (${USER_FRIENDLY_DATE_FORMAT})`)
   })
 
-  robot.respond(regExpMonthYear, function (msg) {
-    const date = msg.match[1]
+  robot.respond(/работаю из дома\s*/i, function (msg) {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
-    let day = parseInt(msg.match[2])
-    let month = parseInt(msg.match[3])
+    let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
+    if (!dayOfWorkFromHome.canWork()) {
+      msg.send(`Ты уже работаешь из дома ${dayOfWorkFromHome[1]}. Если хочешь все отменить, скажи 'не работаю из дома' :wink:.`)
+      return
+    }
+
+    state.n = WAITING_DATE_STATE
+    msg.send(`Ok, в какой день? (сегодня/завтра/${USER_FRIENDLY_DATE_FORMAT})`)
+  })
+
+  robot.respond(/не работаю из дома\s*/i, function (msg) {
+    const state = getStateFromBrain(robot, msg.message.user.name)
+    const user = robot.brain.userForName(msg.message.user.name)
+
+    let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
+    if (!dayOfWorkFromHome.canWork()) {
+      dayOfWorkFromHome.rollback()
+      state.dateOfWorkFromHome = dayOfWorkFromHome
+      state.dateRequested = null
+      if (GOOGLE_API && user.vivaLasVegas.homeWorkEventId) {
+        deleteEventFromCalendar(user.vivaLasVegas.homeWorkEventId)
+      }
+      if (user.vivaLasVegas.homeWorkEventId) {
+        msg.send('Я тебя понял. :ok_hand: Убираю событие из календаря.')
+      } else {
+        msg.send('Я тебя понял. :ok_hand:')
+      }
+      delete user.vivaLasVegas.homeWorkEventId
+    } else {
+      msg.send('У тебя не запланирован день работы из дома, который можно было бы отменить, а прошлого не вернешь...')
+    }
+  })
+
+  robot.respond(regExpMonthYear, function (msg) {
+    const adverb = adverbToDate(msg.match[1], OUTPUT_DATE_FORMAT)
+    const date = adverb || moment(msg.match[2], DATE_FORMAT).format(OUTPUT_DATE_FORMAT)
+    const state = getStateFromBrain(robot, msg.message.user.name)
+
+    let day = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).date()) || parseInt(msg.match[3])
+    let month = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).month()) + 1 || parseInt(msg.match[4])
 
     if ([FROM_STATE, TO_STATE].includes(state.n) && !routines.isValidDate(date, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
@@ -505,9 +600,33 @@ module.exports = async (robot) => {
 
       msg.send(`Значит ты планируешь находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно? (да/нет)`)
     }
+
+    if (state.n === WAITING_DATE_STATE) {
+      const dateOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
+      switch (dateOfWorkFromHome.checkDate(date)) {
+        case 1:
+          msg.send('Не валидная дата.')
+          return
+        case 2:
+          msg.send(`Но ${date} уже прошло :rolling_eyes:. Выбери дату позднее ${moment().add(-1, 'day').format(OUTPUT_DATE_FORMAT)}.`)
+          return
+        case 3:
+          msg.send('Нельзя запланировать день работы из дома больше, чем на две недели вперед.')
+          return
+        case 4:
+          msg.send(`Ты не можешь взять еще один день на этой неделе. Попробуй на следующей.`)
+          return
+        default:
+          dateOfWorkFromHome.push(date)
+      }
+
+      state.dateRequested = dateOfWorkFromHome[1]
+      state.n = WAITING_CONFIRMATION_STATE
+      msg.send('Согласован ли этот день с руководителем/тимлидом? (да/нет)')
+    }
   })
 
-  robot.respond(/(да|нет)\s*/i, function (msg) {
+  robot.respond(/(да|нет)\s*/i, async function (msg) {
     const username = msg.message.user.name
     const state = getStateFromBrain(robot, username)
     const answer = msg.match[1].toLowerCase()
@@ -529,6 +648,32 @@ module.exports = async (robot) => {
       }
 
       state.n = INIT_STATE
+    } else if (state.n === WAITING_CONFIRMATION_STATE) {
+      if (answer === 'да') {
+        let eventId
+        let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
+        state.n = INIT_STATE
+        dayOfWorkFromHome.push(state.dateRequested)
+        state.dateOfWorkFromHome = dayOfWorkFromHome
+        state.dateRequested = ''
+        if (GOOGLE_API) {
+          const date = moment(`${dayOfWorkFromHome[1]}`, DATE_FORMAT)
+          const startDay = date.format('YYYY-MM-DD')
+          const endDay = date.add(1, 'days').format('YYYY-MM-DD')
+          const user = robot.brain.userForName(username)
+
+          eventId = await addEventToCalendar(startDay, endDay, user, GOOGLE_EVENT_WORK_FROM_HOME)
+          user.vivaLasVegas.homeWorkEventId = eventId
+        }
+        if (eventId) {
+          msg.send(`Отлично. Я создал событие в календаре. Ты работаешь из дома ${dayOfWorkFromHome[1]}.`)
+        } else {
+          msg.send(`Отлично. Ты работаешь из дома ${dayOfWorkFromHome[1]}.`)
+        }
+      } else {
+        state.n = INIT_STATE
+        msg.send('Тогда сначала согласуй, а потом пробуй еще раз (ты знаешь где меня найти).')
+      }
     } else if (!state.reportToCustomer) {
       if (answer === 'да') {
         state.reportToCustomer = true
@@ -563,7 +708,8 @@ module.exports = async (robot) => {
       }
 
       if (GOOGLE_API && user.vivaLasVegas.eventId) {
-        deletEventOfVacation(user)
+        deleteEventFromCalendar(user.vivaLasVegas.eventId)
+        delete user.vivaLasVegas.eventId
       }
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
@@ -612,7 +758,8 @@ module.exports = async (robot) => {
         ).add(1, 'day').format('YYYY-MM-DD')
 
         if (GOOGLE_API) {
-          addEventOfVacation(leaveStart, leaveEnd, user)
+          const eventId = await addEventToCalendar(leaveStart, leaveEnd, user, GOOGLE_EVENT_VACATION)
+          user.vivaLasVegas.eventId = eventId
         }
       } else {
         result = 'отклонена'
