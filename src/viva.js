@@ -33,6 +33,7 @@ module.exports = async (robot) => {
   const MAXIMUM_LENGTH_OF_WAIT = parseInt(process.env.MAXIMUM_LENGTH_OF_WAIT, 10) || 7
   const MINIMUM_DAYS_BEFORE_REQUEST = parseInt(process.env.MINIMUM_DAYS_BEFORE_REQUEST, 10) || 7
   const VIVA_REMINDER_SCHEDULER = process.env.VIVA_REMINDER_SCHEDULER || '0 0 7 * * *'
+  const VIVA_REPORT_SCHEDULER = process.env.VIVA_REPORT_SCHEDULER || '0 0 11 * * *'
 
   const INIT_STATE = 0
   const FROM_STATE = 1
@@ -427,6 +428,63 @@ module.exports = async (robot) => {
     }
 
     return false
+  }
+
+  /*
+   * Send to the general channel information about the status of users.
+   *
+   * @param {Robot} robot - Robot instance.
+   */
+  function prepareDailyReport (robot) {
+    const allUsers = Object.values(robot.brain.data.users)
+    const informer = {}
+    const today = moment()
+    let workFromHome = allUsers
+      .filter(user => {
+        if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome) {
+          const date = moment(user.vivaLasVegas.dateOfWorkFromHome[1], CREATION_DATE_FORMAT)
+
+          return isEqualMonthDay(today, date)
+        }
+      })
+    let backFromVacation = allUsers
+      .filter(user => {
+        if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
+          const d = user.vivaLasVegas.leaveEnd.day
+          const m = user.vivaLasVegas.leaveEnd.month
+          const y = user.vivaLasVegas.leaveEnd.year
+          const leaveEnd = moment(`${d}.${m}.${y}`, CREATION_DATE_FORMAT).add(1, 'days')
+
+          return isEqualMonthDay(today, leaveEnd)
+        }
+      })
+    let wentOnVacation = allUsers
+      .filter(user => {
+        if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
+          const d = user.vivaLasVegas.leaveStart.day
+          const m = user.vivaLasVegas.leaveStart.month
+          const y = user.vivaLasVegas.leaveStart.year
+          const leaveStart = moment(`${d}.${m}.${y}`, CREATION_DATE_FORMAT)
+
+          return isEqualMonthDay(today, leaveStart)
+        }
+      })
+    informer[`Из дома работа${workFromHome.length > 1 ? 'ют' : 'ет'}`] = workFromHome
+    informer[`${wentOnVacation.length > 1 ? 'Ушли' : 'Пользователь ушел'} в отпуск`] = wentOnVacation
+    informer[`${backFromVacation.length > 1 ? 'Вернулись' : 'Пользователь вернулся'} из отпуска`] = backFromVacation
+    // Form mesage
+    const message = []
+    for (const key in informer) {
+      const value = informer[key]
+
+      if (value && value.length) {
+        message.push(`${key}: ${value.map(user => `${value.length > 1 ? '\n' : ''}@${user.name}`).join('')}`)
+      }
+    }
+    if (message.length) {
+      const today = `*Сегодня:*\n`
+      robot.messageRoom('general', today + message.join('\n'))
+    }
   }
 
   robot.respond(/хочу в отпуск\s*/i, function (msg) {
@@ -959,5 +1017,7 @@ module.exports = async (robot) => {
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 30))
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14))
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkIfNotReported(robot))
+
+    schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => prepareDailyReport(robot))
   }
 }
