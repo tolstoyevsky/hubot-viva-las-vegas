@@ -470,7 +470,7 @@ module.exports = async (robot) => {
     msg.send(`Ok, с какого числа? (${USER_FRIENDLY_DATE_FORMAT})`)
   })
 
-  robot.respond(/работаю из дома\s*/i, function (msg) {
+  robot.respond(/работаю (из )?дома\s*/i, function (msg) {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
     let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
@@ -483,7 +483,7 @@ module.exports = async (robot) => {
     msg.send(`Ok, в какой день? (сегодня/завтра/${USER_FRIENDLY_DATE_FORMAT})`)
   })
 
-  robot.respond(/не работаю из дома\s*/i, function (msg) {
+  robot.respond(/не работаю (из )?дома\s*/i, function (msg) {
     const state = getStateFromBrain(robot, msg.message.user.name)
     const user = robot.brain.userForName(msg.message.user.name)
 
