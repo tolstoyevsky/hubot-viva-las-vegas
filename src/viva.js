@@ -73,7 +73,7 @@ module.exports = async (robot) => {
     '',
     `C какого числа ты хочешь уйти в отпуск? (${USER_FRIENDLY_DATE_FORMAT})`,
     `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
-    'Отправить текущую заявку в HR-отдел? (да/нет)'
+    'Отправить текущую заявку в HR-отдел?'
   ])
 
   const { Stack } = require('./stack')
@@ -385,7 +385,13 @@ module.exports = async (robot) => {
           message.push(` @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${isReport(user.vivaLasVegas.reportToCustomer)}`)
 
           if (!user.vivaLasVegas.reportToCustomer) {
-            const question = `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден? (да/нет)`
+            const question = routines.buildMessageWithButtons(
+              `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден?`,
+              [
+                ['Да', 'Да, предупрежден'],
+                ['Нет', 'Нет, не предупрежден']
+              ]
+            )
             robot.adapter.sendDirect({ user: { name: user.name } }, question)
           }
         }
@@ -447,7 +453,18 @@ module.exports = async (robot) => {
         }
       }
 
-      msg.send(`${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`)
+      if (state.n === 3) {
+        const message = routines.buildMessageWithButtons(
+          `${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`,
+          [
+            ['Да', 'Да, планирую'],
+            ['Нет', 'Нет, не планирую']
+          ]
+        )
+        msg.send(message)
+      } else {
+        msg.send(`${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`)
+      }
 
       return
     }
@@ -598,7 +615,15 @@ module.exports = async (robot) => {
       state.leaveEnd = leaveEnd
       state.n = CONFIRM_STATE
 
-      msg.send(`Значит ты планируешь находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно? (да/нет)`)
+      const buttonsMessage = routines.buildMessageWithButtons(
+        `Значит ты планируешь находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно?`,
+        [
+          ['Да', 'Да, планирую'],
+          ['Нет', 'Нет, не планирую']
+        ]
+      )
+
+      msg.send(buttonsMessage)
     }
 
     if (state.n === WAITING_DATE_STATE) {
@@ -622,22 +647,36 @@ module.exports = async (robot) => {
 
       state.dateRequested = dateOfWorkFromHome[1]
       state.n = WAITING_CONFIRMATION_STATE
-      msg.send('Согласован ли этот день с руководителем/тимлидом? (да/нет)')
+      const buttonsMessage = routines.buildMessageWithButtons(
+        'Согласован ли этот день с руководителем/тимлидом?',
+        [
+          ['Да', 'Да, согласован'],
+          ['Нет', 'Нет, не согласован']
+        ]
+      )
+      msg.send(buttonsMessage)
     }
   })
 
-  robot.respond(/(да|нет)\s*/i, async function (msg) {
+  robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, msg => {
     const username = msg.message.user.name
     const state = getStateFromBrain(robot, username)
-    const answer = msg.match[1].toLowerCase()
+    const answer = msg.match[1].toLowerCase().trim()
 
     if (state.n === CONFIRM_STATE) {
-      if (answer === 'да') {
+      if (answer === 'да, планирую') {
         const deadline = moment(state.creationDate, CREATION_DATE_FORMAT).add(MAXIMUM_LENGTH_OF_WAIT, 'days').format('DD.MM')
         const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M').format('DD.MM')
         const to = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M').format('DD.MM')
 
-        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${username} хочет в отпуск с ${from} по ${to}. Ответ нужно дать до ${deadline}.`)
+        const buttonsMessage = routines.buildMessageWithButtons(
+          `Пользователь @${username} хочет в отпуск с ${from} по ${to}. Ответ нужно дать до ${deadline}.`,
+          [
+            ['Одобрить', `${robot.alias} одобрить заявку @${username}`],
+            ['Отклонить', `${robot.alias} отклонить заявку @${username}`]
+          ]
+        )
+        robot.messageRoom(LEAVE_COORDINATION_CHANNEL, buttonsMessage)
 
         state.requestStatus = PENDING_STATUS
         state.reportToCustomer = false
@@ -648,8 +687,16 @@ module.exports = async (robot) => {
       }
 
       state.n = INIT_STATE
-    } else if (state.n === WAITING_CONFIRMATION_STATE) {
-      if (answer === 'да') {
+    }
+  })
+
+  robot.respond(/(Да, согласован|Нет, не согласован)\s*$/i, async msg => {
+    const username = msg.message.user.name
+    const state = getStateFromBrain(robot, username)
+    const answer = msg.match[1].toLowerCase().trim()
+
+    if (state.n === WAITING_CONFIRMATION_STATE) {
+      if (answer === 'да, согласован') {
         let eventId
         let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
         state.n = INIT_STATE
@@ -674,8 +721,16 @@ module.exports = async (robot) => {
         state.n = INIT_STATE
         msg.send('Тогда сначала согласуй, а потом пробуй еще раз (ты знаешь где меня найти).')
       }
-    } else if (!state.reportToCustomer) {
-      if (answer === 'да') {
+    }
+  })
+
+  robot.respond(/(Да, предупрежден|Нет, не предупрежден)\s*$/i, msg => {
+    const username = msg.message.user.name
+    const state = getStateFromBrain(robot, username)
+    const answer = msg.match[1].toLowerCase()
+
+    if (!state.reportToCustomer) {
+      if (answer === 'да, предупрежден') {
         state.reportToCustomer = true
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${username} только что сообщил, что предупредил заказчика о своем отпуске.`)
         msg.send(':thumbsup:')
