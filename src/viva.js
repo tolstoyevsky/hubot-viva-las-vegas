@@ -433,7 +433,7 @@ module.exports = async (robot) => {
   robot.respond(/хочу в отпуск\s*/i, function (msg) {
     const state = getStateFromBrain(robot, msg.message.user.name)
 
-    if (state.n !== undefined && state.n !== INIT_STATE) {
+    if (state.n !== undefined && state.n !== INIT_STATE && state.n < CONFIRM_STATE) {
       const leaveStart = state.leaveStart
       const leaveEnd = state.leaveEnd
       let infoMessage
