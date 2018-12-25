@@ -876,7 +876,6 @@ module.exports = async (robot) => {
     }
 
     const username = msg.match[2].trim()
-    const user = robot.brain.userForName(username)
     const state = getStateFromBrain(robot, username)
 
     if (state.requestStatus === APPROVED_STATUS) {
@@ -886,9 +885,9 @@ module.exports = async (robot) => {
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
       }
 
-      if (GOOGLE_API && user.vivaLasVegas.eventId) {
-        deleteEventFromCalendar(user.vivaLasVegas.eventId)
-        delete user.vivaLasVegas.eventId
+      if (GOOGLE_API && state.eventId) {
+        deleteEventFromCalendar(state.eventId)
+        delete state.eventId
       }
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
@@ -937,7 +936,7 @@ module.exports = async (robot) => {
 
         if (GOOGLE_API) {
           const eventId = await addEventToCalendar(leaveStart, leaveEnd, user, GOOGLE_EVENT_VACATION)
-          user.vivaLasVegas.eventId = eventId
+          state.eventId = eventId
         }
       } else {
         result = 'отклонена'
