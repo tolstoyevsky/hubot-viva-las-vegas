@@ -62,11 +62,12 @@ The following command is
 * for admin use only.
 
 ```
-some.user >> hubot viva reset @user.name 15.10
-    hubot >> Готово!
+some.user >> hubot viva reset @user.name 15.10.2015 25.10.2015
+    hubot >> Даты отпуска успешно перезаписаны!
+             @user.name в отпуске с 15.10.2015 по 25.10.2015.
 ```
 
-In this case the leave end of the user named `user.name` was changed to `15.10` (October 15). It allows simulating returning from leave.
+In this case the leave start of the user named `user.name` was changed to `15.10.2015` (October 15 2015) and the leave end was changed to `25.10.2015` (October 25 2015). It is not mandatory to set both dates, if you replace one of them by `*` it will stay unchanged. It allows simulating returning and starting vacation.
 
 ## Integration with Google Calendar
 

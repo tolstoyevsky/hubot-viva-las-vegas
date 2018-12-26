@@ -47,7 +47,6 @@ module.exports = async (robot) => {
 
   const ANGRY_MSG = 'Давай по порядку!'
   const ACCESS_DENIED_MSG = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
-  const DONE_MSG = 'Готово!'
   const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
 
   const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/)
@@ -837,34 +836,71 @@ module.exports = async (robot) => {
   })
 
   /**
-   * Overwrites vacation ending date.
+   * Overwrites vacation dates.
    *
-   * @example viva reset @username DD.MM.
+   * @example viva reset @username DD.MM.YYYY-DD.MM.YYYY
    */
-  robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}))\s*/i, async (msg) => {
+  robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}\.\d{4}|\*)[ -](\d{1,2}\.\d{1,2}\.\d{4}|\*))\s*/i, async (msg) => {
     if (!await routines.isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED_MSG)
       return
     }
 
     const username = msg.match[2]
-    const dateMonth = msg.match[3]
+    const leaveStart = msg.match[3]
+    const leaveEnd = msg.match[4]
 
-    if (!routines.isValidDate(dateMonth, DATE_FORMAT)) {
+    if (![leaveStart, leaveEnd].every(item => item === '*' || routines.isValidDate(item, 'D.M.YYYY'))) {
       msg.send(INVALID_DATE_MSG)
 
       return
     }
 
-    const user = robot.brain.userForName(username)
+    const users = Object.values(robot.brain.data.users)
+      .map(user => {
+        return routines.doesUserExist(robot, user).then((isExist) => {
+          return { user, isExist }
+        })
+      })
 
-    user.vivaLasVegas.leaveEnd = {
-      day: dateMonth.split('.')[0],
-      month: dateMonth.split('.')[1],
-      year: moment().year()
+    const filteredUser = (await Promise.all(users)
+      .then(array => array.filter(item => item.isExist)))
+      .find(user => user.user.name === username)
+
+    const find = Object.values(robot.brain.data.users)
+      .find(user => user.id === filteredUser.user.id)
+
+    if (find) {
+      let day, month, year
+      const dates = []
+
+      if (leaveStart !== '*') {
+        day = parseInt(leaveStart.split('.')[0])
+        month = parseInt(leaveStart.split('.')[1])
+        year = parseInt(leaveStart.split('.')[2])
+        find.vivaLasVegas.leaveStart = { day, month, year }
+
+        dates.leaveStart = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
+      } else {
+        const leaveDate = Object.values(find.vivaLasVegas.leaveStart).join('.')
+        dates.leaveStart = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
+      }
+
+      if (leaveEnd !== '*') {
+        day = parseInt(leaveEnd.split('.')[0])
+        month = parseInt(leaveEnd.split('.')[1])
+        year = parseInt(leaveEnd.split('.')[2])
+        find.vivaLasVegas.leaveEnd = { day, month, year }
+        dates.leaveEnd = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
+      } else {
+        const leaveDate = Object.values(find.vivaLasVegas.leaveEnd).join('.')
+        dates.leaveEnd = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
+      }
+
+      msg.send(`Даты отпуска успешно перезаписаны!\n@${username} в отпуске с ${dates.leaveStart} по ${dates.leaveEnd}.`)
+    } else {
+      msg.send('*Ошибка*. Не удалось найти пользователя.')
     }
-
-    msg.send(DONE_MSG)
   })
 
   robot.respond(/список заявок\s*/i, async msg => {
