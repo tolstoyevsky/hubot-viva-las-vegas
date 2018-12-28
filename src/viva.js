@@ -6,6 +6,8 @@
 //    hubot работаю из дома - sets the status of work from home and adds the corresponding event to the calendar
 //    hubot не работаю из дома - removes work from home status and deletes the corresponding event from the calendar
 //    hubot хочу в отпуск - initiates a new leave request
+//    hubot болею - sets the status of being ill and adds the corresponding event to the calendar
+//    hubot не болею - removes status of being ill and stops the prolongation of the corresponding event in the calendar
 //    begin admin
 //      hubot одобрить заявку @username - approves the leave request for the specified user
 //      hubot отклонить заявку @username - rejects the leave request for the specified user
@@ -22,6 +24,8 @@ module.exports = async (robot) => {
   const schedule = require('node-schedule')
 
   const GOOGLE_API = process.env.GOOGLE_API === 'true' || false
+  const GOOGLE_EVENT_SICK = 'Болеет'
+  const GOOGLE_EVENT_SICK_WITH_WORK = 'Болеет (работа из дома)'
   const GOOGLE_EVENT_VACATION = 'Отпуск'
   const GOOGLE_EVENT_WORK_FROM_HOME = 'Работа из дома'
   const GOOGLE_CALENDAR_NAME = process.env.GOOGLE_CALENDAR_NAME || 'WIS Calendar'
@@ -316,6 +320,36 @@ module.exports = async (robot) => {
     })
   }
 
+  /**
+   * Get the event from the calendar by id.
+   *
+   * @param {string} eventId - Event id.
+   */
+  function getEventFromCalendar (eventId) {
+    return GOOGLE_CALENDAR.events.get({
+      calendarId: GOOGLE_CALENDAR_ID,
+      eventId
+    }).catch(() => {
+      routines.rave(robot, 'An error occurred when attempting to get an event from the calendar.')
+    })
+  }
+
+  /**
+   * Update the event from the calendar by id.
+   *
+   * @param {string} eventId - Event id.
+   * @param {Object} resource - Event data.
+   */
+  function updateEventFromCalendar (eventId, resource) {
+    return GOOGLE_CALENDAR.events.update({
+      calendarId: GOOGLE_CALENDAR_ID,
+      eventId,
+      resource
+    }).catch(() => {
+      routines.rave(robot, 'An error occurred when attempting to update an event from the calendar.')
+    })
+  }
+
   (async () => {
     if (GOOGLE_API) {
       if (GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY) {
@@ -455,9 +489,14 @@ module.exports = async (robot) => {
           return isEqualMonthDay(today, leaveStart)
         }
       })
+    let sickPeople = allUsers.filter(user => user.sick && !user.sick.isWork)
+    let sickPeopleWorkHome = allUsers.filter(user => user.sick && user.sick.isWork)
+
     informer[`Из дома работа${workFromHome.length > 1 ? 'ют' : 'ет'}`] = workFromHome
     informer[`${wentOnVacation.length > 1 ? 'Ушли' : 'Пользователь ушел'} в отпуск`] = wentOnVacation
     informer[`${backFromVacation.length > 1 ? 'Вернулись' : 'Пользователь вернулся'} из отпуска`] = backFromVacation
+    informer[`Боле${sickPeople.length > 1 ? 'ют' : 'ет'}`] = sickPeople
+    informer[`Боле${sickPeopleWorkHome.length > 1 ? 'ют' : 'ет'} (работа из дома)`] = sickPeopleWorkHome
     // Form mesage
     const message = []
     for (const key in informer) {
@@ -486,6 +525,44 @@ module.exports = async (robot) => {
   function sortingByStatus (a, b) {
     if (!a.reportToCustomer && b.reportToCustomer) return -1
     if (a.reportToCustomer && !b.reportToCustomer) return 1
+  }
+
+  /**
+   * Get all existing user
+   *
+   * @param {Robot} robot - Hubot instance.
+   */
+  async function getAllExistingUser (robot) {
+    const allUsers = Object.values(robot.brain.data.users)
+      .map(user => {
+        return routines.doesUserExist(robot, user).then((isExist) => {
+          return { user, isExist }
+        })
+      })
+
+    return (Promise.all(allUsers)
+      .catch(() => { routines.rave(robot, 'Can\'t filter users') })
+      .then(array => array.filter(user => user.isExist)))
+  }
+
+  /**
+   * Extend all user's disease
+   *
+   * @param {Robot} robot - Hubot instance.
+   */
+  async function dailySickExtension (robot) {
+    const allUsers = await getAllExistingUser(robot)
+    const tomorrow = moment().add(1, 'day')
+
+    for (const { user } of allUsers.filter(item => item.user.sick)) {
+      if (GOOGLE_API && user.sick.eventId) {
+        getEventFromCalendar(user.sick.eventId)
+          .then(event => {
+            event.data.end = { date: tomorrow.format('YYYY-MM-DD') }
+            updateEventFromCalendar(user.sick.eventId, event.data)
+          })
+      }
+    }
   }
 
   robot.respond(/хочу в отпуск\s*/i, function (msg) {
@@ -1010,12 +1087,132 @@ module.exports = async (robot) => {
     msg.send(result.join('\n'))
   })
 
+  robot.respond(/(я )?(болею|заболел)\s*$/i, async msg => {
+    const user = robot.brain.userForId(msg.message.user.id)
+
+    // if already sick
+    if (user.sick) {
+      msg.send('Я уже слышал, что ты болеешь. :thinking:')
+
+      return
+    }
+
+    const message = routines.buildMessageWithButtons(
+      'Очень жаль. Ты в состоянии работать из дома в эти дни?',
+      [
+        ['Да', 'Болею и работаю'],
+        ['Нет', 'Болею и не работаю']
+      ]
+    )
+
+    user.sickConfirming = true
+
+    msg.send(message)
+  })
+
+  robot.respond(/(Болею и работаю|Болею и не работаю)\s*/i, msg => {
+    const user = robot.brain.userForId(msg.message.user.id)
+
+    if (user.sick) return
+    if (!(typeof user.sickConfirming === 'boolean')) return
+
+    user.sickConfirming = msg.match[1].toLowerCase()
+
+    const message = routines.buildMessageWithButtons(
+      'Я понял. Согласовано ли отсутствие с руководителем/тимлидом?',
+      [
+        ['Да', 'Да, они предупреждены, что я болею'],
+        ['Нет', 'Нет, они не предупреждены, что я болею']
+      ]
+    )
+
+    msg.send(message)
+  })
+
+  robot.respond(/(Да, они предупреждены, что я болею|Нет, они не предупреждены, что я болею)/i, async msg => {
+    const user = robot.brain.userForId(msg.message.user.id)
+    const today = moment()
+    const tomorrow = moment().add(1, 'days')
+
+    if (user.sick) return
+    if (!(typeof user.sickConfirming === 'string')) return
+
+    if (msg.match[1].toLowerCase() === 'да, они предупреждены, что я болею') {
+      const isWork = user.sickConfirming === 'болею и работаю'
+
+      if (!user.sick) {
+        user.sick = Object()
+      }
+
+      let isCalendar = String()
+      if (GOOGLE_API) {
+        const eventId = await addEventToCalendar(
+          today.format('YYYY-MM-DD'),
+          tomorrow.format('YYYY-MM-DD'),
+          user,
+          isWork ? GOOGLE_EVENT_SICK_WITH_WORK : GOOGLE_EVENT_SICK
+        )
+
+        isCalendar = ' Я добавил событие в календарь.'
+        user.sick.eventId = eventId
+      }
+
+      user.sick.start = today.format(CREATION_DATE_FORMAT)
+      user.sick.isWork = isWork
+      delete user.sickConfirming
+
+      robot.messageRoom(
+        LEAVE_COORDINATION_CHANNEL,
+        `@${user.name} болеет и ${isWork ? 'работает' : 'не может работать'} из дома`
+      )
+
+      msg.send(`Ok. Выздоравливай поскорее.${isCalendar} Когда ты выйдешь на работу, скажи мне \`я не болею\`.`)
+    } else {
+      delete user.sickConfirming
+      msg.send('Тогда сначала предупреди, а потом вернись и повтори все снова!')
+    }
+  })
+
+  robot.respond(/(я )?(не болею|выздоровел)\s*/i, msg => {
+    const user = robot.brain.userForId(msg.message.user.id)
+
+    if (!user.sick) {
+      msg.send('А ты разве болеешь?')
+
+      return
+    }
+
+    let isCalendar = String()
+    if (GOOGLE_API && user.sick.eventId) {
+      getEventFromCalendar(user.sick.eventId)
+        .then(event => {
+          const startDate = moment(user.sick.start, 'DD.MM.YYYY')
+          const yesterday = moment()
+
+          if (isEqualMonthDay(startDate, yesterday)) {
+            isCalendar = ' Я удалил событие из календаря.'
+            return deleteEventFromCalendar(user.sick.eventId)
+          } else {
+            event.data.end = { date: yesterday.format('YYYY-MM-DD') }
+            isCalendar = ' Я исправил событие в календаре.'
+            return updateEventFromCalendar(user.sick.eventId, event.data)
+          }
+        }).then(() => {
+          delete user.sick
+
+          msg.send(`Рад видеть тебя снова!${isCalendar}`)
+        })
+    }
+  })
+
   if (VIVA_REMINDER_SCHEDULER) {
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
 
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
 
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14, 30, 1))
+
+    schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => dailySickExtension(robot))
 
     schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => prepareDailyReport(robot))
   }
