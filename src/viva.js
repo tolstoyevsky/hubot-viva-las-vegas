@@ -1,11 +1,6 @@
 // Description:
 //   A Hubot script which helps users to create leave requests.
 //
-// Configuration:
-//   LEAVE_COORDINATION_CHANNEL - The channel name to handle users leave requests
-//   MAXIMUM_LENGTH_OF_LEAVE - The maximum number of days an employee is allowed to be on leave
-//   MAXIMUM_LENGTH_OF_WAIT - The maximum number of days each request may take
-//
 // Commands:
 //  begin group Viva Las Vegas
 //    hubot работаю из дома - sets the status of work from home and adds the corresponding event to the calendar
