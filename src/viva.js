@@ -49,7 +49,7 @@ module.exports = async (robot) => {
   const ACCESS_DENIED_MSG = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
   const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
 
-  const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/)
+  const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/, 'i')
 
   // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
   const botChannels = await robot.adapter.api.get('channels.list.joined')
@@ -582,7 +582,7 @@ module.exports = async (robot) => {
   })
 
   robot.respond(regExpMonthYear, function (msg) {
-    const adverb = adverbToDate(msg.match[1], OUTPUT_DATE_FORMAT)
+    const adverb = adverbToDate(msg.match[1].toLowerCase(), OUTPUT_DATE_FORMAT)
     const date = adverb || moment(msg.match[2], DATE_FORMAT).format(OUTPUT_DATE_FORMAT)
     const state = getStateFromBrain(robot, msg.message.user.name)
 
