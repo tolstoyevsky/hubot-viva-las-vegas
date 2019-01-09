@@ -78,7 +78,7 @@ module.exports = async (robot) => {
 
   const { Stack } = require('./stack')
 
-  let users = Object.values(robot.brain.data.users)
+  let users = await routines.getAllUsers(robot)
 
   users.forEach(user => {
     if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome && typeof user.vivaLasVegas.dateOfWorkFromHome === 'string') {
@@ -170,13 +170,6 @@ module.exports = async (robot) => {
     return calendars.shift().id
   }
 
-  function checkIfUserExists (robot, username) {
-    const users = robot.brain.data.users
-    const usernames = Object.values(users).map(user => user.name)
-
-    return usernames.indexOf(username) > -1
-  }
-
   function cleanupState (state) {
     state.n = INIT_STATE
     delete state.leaveStart
@@ -184,8 +177,8 @@ module.exports = async (robot) => {
     delete state.requestStatus
   }
 
-  function getStateFromBrain (robot, username) {
-    const users = robot.brain.usersForFuzzyName(username)
+  async function getStateFromBrain (robot, username) {
+    const users = await routines.findUserByName(robot, username)
 
     users[0].vivaLasVegas = users[0].vivaLasVegas || {}
 
@@ -227,11 +220,9 @@ module.exports = async (robot) => {
     }
   }
 
-  function sendRemindersToChannel (robot) {
-    const users = robot.brain.data.users
-
-    for (const user of Object.values(users)) {
-      const state = getStateFromBrain(robot, user.name)
+  async function sendRemindersToChannel (robot) {
+    for (const user of await routines.getAllUsers(robot)) {
+      const state = await getStateFromBrain(robot, user.name)
 
       if (state.requestStatus === PENDING_STATUS) {
         const deadline = moment(state.creationDate, CREATION_DATE_FORMAT).add(MAXIMUM_LENGTH_OF_WAIT, 'days').format('DD.MM')
@@ -247,11 +238,9 @@ module.exports = async (robot) => {
    * @param {Robot} robot - Hubot instance.
    * @returns {Void}
    */
-  function resetLeaveStatus (robot) {
-    const users = robot.brain.data.users
-
-    for (const user of Object.values(users)) {
-      const state = getStateFromBrain(robot, user.name)
+  async function resetLeaveStatus (robot) {
+    for (const user of await routines.getAllUsers(robot)) {
+      const state = await getStateFromBrain(robot, user.name)
 
       if (state.requestStatus === APPROVED_STATUS) {
         const yesterday = moment().add(-1, 'day')
@@ -383,7 +372,7 @@ module.exports = async (robot) => {
    * @param {Robot} robot - Hubot instance.
    */
   async function checkLeaveTimeLeft (robot) {
-    const users = Object.values(robot.brain.data.users)
+    const users = await routines.getAllUsers(robot)
     const sortedUsers = users
       .filter(users => users.vivaLasVegas && users.vivaLasVegas.leaveStart && users.vivaLasVegas.requestStatus === APPROVED_STATUS)
       .sort((a, b) => sortingByValue(a.vivaLasVegas, b.vivaLasVegas, 'DD.MM.YYYY'))
@@ -392,31 +381,29 @@ module.exports = async (robot) => {
     let message = []
 
     for (const user of sortedUsers) {
-      if (await routines.isUserActive(robot, user)) {
-        const obj = user.vivaLasVegas.leaveStart
-        const reportStatus = user.vivaLasVegas.reportToCustomer
-        const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
-        const amount = leaveStart.diff(moment(), 'days') + 1
-        const days = Object.values(arguments).slice(1)
-        const currentDay = days.indexOf(parseInt(amount)) >= 0
+      const obj = user.vivaLasVegas.leaveStart
+      const reportStatus = user.vivaLasVegas.reportToCustomer
+      const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
+      const amount = leaveStart.diff(moment(), 'days') + 1
+      const days = Object.values(arguments).slice(1)
+      const currentDay = days.indexOf(parseInt(amount)) >= 0
 
-        if (currentDay) {
-          if ((amount === 1 && !reportStatus) || amount !== 1) {
-            const emoji = isReport(reportStatus)[0]
-            const status = isReport(reportStatus)[1]
-            message.push(`${emoji} @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${status}`)
-          }
+      if (currentDay) {
+        if ((amount === 1 && !reportStatus) || amount !== 1) {
+          const emoji = isReport(reportStatus)[0]
+          const status = isReport(reportStatus)[1]
+          message.push(`${emoji} @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${status}`)
+        }
 
-          if (!reportStatus) {
-            const question = routines.buildMessageWithButtons(
-              `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден?`,
-              [
-                ['Да', 'Да, предупрежден'],
-                ['Нет', 'Нет, не предупрежден']
-              ]
-            )
-            robot.adapter.sendDirect({ user: { name: user.name } }, question)
-          }
+        if (!reportStatus) {
+          const question = routines.buildMessageWithButtons(
+            `Привет, твой отпуск начинается уже через ${noname(amount)}. Заказчик предупрежден?`,
+            [
+              ['Да', 'Да, предупрежден'],
+              ['Нет', 'Нет, не предупрежден']
+            ]
+          )
+          robot.adapter.sendDirect({ user: { name: user.name } }, question)
         }
       }
     }
@@ -452,8 +439,8 @@ module.exports = async (robot) => {
    *
    * @param {Robot} robot - Robot instance.
    */
-  function prepareDailyReport (robot) {
-    const allUsers = Object.values(robot.brain.data.users)
+  async function prepareDailyReport (robot) {
+    const allUsers = await routines.getAllUsers(robot)
     const informer = {}
     const today = moment()
     if ([6, 0].includes(today.day())) return
@@ -525,33 +512,15 @@ module.exports = async (robot) => {
   }
 
   /**
-   * Get all existing user
-   *
-   * @param {Robot} robot - Hubot instance.
-   */
-  async function getAllExistingUser (robot) {
-    const allUsers = Object.values(robot.brain.data.users)
-      .map(user => {
-        return routines.doesUserExist(robot, user).then((isExist) => {
-          return { user, isExist }
-        })
-      })
-
-    return (Promise.all(allUsers)
-      .catch(() => { routines.rave(robot, 'Can\'t filter users') })
-      .then(array => array.filter(user => user.isExist)))
-  }
-
-  /**
    * Extend all user's disease
    *
    * @param {Robot} robot - Hubot instance.
    */
   async function dailySickExtension (robot) {
-    const allUsers = await getAllExistingUser(robot)
+    const allUsers = await routines.getAllUsers(robot)
     const tomorrow = moment().add(1, 'day')
 
-    for (const { user } of allUsers.filter(item => item.user.sick)) {
+    for (const user of allUsers.filter(item => item.user.sick)) {
       if (GOOGLE_API && user.sick.eventId) {
         getEventFromCalendar(user.sick.eventId)
           .then(event => {
@@ -649,8 +618,8 @@ module.exports = async (robot) => {
     msg.send(`Ok, с какого числа? (${USER_FRIENDLY_DATE_FORMAT})`)
   })
 
-  robot.respond(/работаю (из )?дома\s*/i, function (msg) {
-    const state = getStateFromBrain(robot, msg.message.user.name)
+  robot.respond(/работаю (из )?дома\s*/i, async function (msg) {
+    const state = await getStateFromBrain(robot, msg.message.user.name)
 
     let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
     if (!dayOfWorkFromHome.canWork()) {
@@ -662,9 +631,9 @@ module.exports = async (robot) => {
     msg.send(`Ok, в какой день? (сегодня/завтра/${USER_FRIENDLY_DATE_FORMAT})`)
   })
 
-  robot.respond(/не работаю (из )?дома\s*/i, function (msg) {
-    const state = getStateFromBrain(robot, msg.message.user.name)
-    const user = robot.brain.userForName(msg.message.user.name)
+  robot.respond(/не работаю (из )?дома\s*/i, async function (msg) {
+    const state = await getStateFromBrain(robot, msg.message.user.name)
+    const user = await routines.findUserByName(robot, msg.message.user.name)
 
     let dayOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
     if (!dayOfWorkFromHome.canWork()) {
@@ -882,9 +851,9 @@ module.exports = async (robot) => {
     delete customer.vivaLasVegas.allocation
   })
 
-  robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, msg => {
+  robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, async msg => {
     const username = msg.message.user.name
-    const state = getStateFromBrain(robot, username)
+    const state = await getStateFromBrain(robot, username)
     const answer = msg.match[1].toLowerCase().trim()
 
     if (state.n === CONFIRM_STATE) {
@@ -916,7 +885,7 @@ module.exports = async (robot) => {
 
   robot.respond(/(Да, согласован|Нет, не согласован)\s*$/i, async msg => {
     const username = msg.message.user.name
-    const state = getStateFromBrain(robot, username)
+    const state = await getStateFromBrain(robot, username)
     const answer = msg.match[1].toLowerCase().trim()
 
     if (state.n === WAITING_CONFIRMATION_STATE) {
@@ -931,7 +900,7 @@ module.exports = async (robot) => {
           const date = moment(`${dayOfWorkFromHome[1]}`, DATE_FORMAT)
           const startDay = date.format('YYYY-MM-DD')
           const endDay = date.add(1, 'days').format('YYYY-MM-DD')
-          const user = robot.brain.userForName(username)
+          const user = await routines.findUserByName(robot, username)
 
           eventId = await addEventToCalendar(startDay, endDay, user, GOOGLE_EVENT_WORK_FROM_HOME)
           user.vivaLasVegas.homeWorkEventId = eventId
@@ -948,9 +917,9 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(Да, предупрежден|Нет, не предупрежден)\s*$/i, msg => {
+  robot.respond(/(Да, предупрежден|Нет, не предупрежден)\s*$/i, async msg => {
     const username = msg.message.user.name
-    const state = getStateFromBrain(robot, username)
+    const state = await getStateFromBrain(robot, username)
     const answer = msg.match[1].toLowerCase()
 
     if (!state.reportToCustomer) {
@@ -971,7 +940,7 @@ module.exports = async (robot) => {
     }
 
     const username = msg.match[2].trim()
-    const state = getStateFromBrain(robot, username)
+    const state = await getStateFromBrain(robot, username)
 
     if (state.requestStatus === APPROVED_STATUS) {
       cleanupState(state)
@@ -996,15 +965,16 @@ module.exports = async (robot) => {
   robot.respond(/(одобрить|отклонить) заявку @?(.+)\s*/i, async (msg) => {
     const action = msg.match[1]
     const username = msg.match[2].trim()
+    const user = await routines.findUserByName(robot, username)
 
     if (!await routines.isAdmin(robot, msg.message.user.name)) {
       msg.send(ACCESS_DENIED_MSG)
       return
     }
 
-    if (checkIfUserExists(robot, username)) {
-      const state = getStateFromBrain(robot, username)
-      const user = robot.brain.userForName(username)
+    if (await routines.isUserActive(robot, user)) {
+      const state = await getStateFromBrain(robot, username)
+      const user = await routines.findUserByName(robot, username)
       let result
 
       if (state.requestStatus !== PENDING_STATUS) {
@@ -1072,21 +1042,9 @@ module.exports = async (robot) => {
       return
     }
 
-    const users = Object.values(robot.brain.data.users)
-      .map(user => {
-        return routines.doesUserExist(robot, user).then((isExist) => {
-          return { user, isExist }
-        })
-      })
+    const user = await routines.findUserByName(robot, username)
 
-    const filteredUser = (await Promise.all(users)
-      .then(array => array.filter(item => item.isExist)))
-      .find(user => user.user.name === username)
-
-    const find = Object.values(robot.brain.data.users)
-      .find(user => user.id === filteredUser.user.id)
-
-    if (find) {
+    if (user) {
       let day, month, year
       const dates = []
 
@@ -1094,11 +1052,11 @@ module.exports = async (robot) => {
         day = parseInt(leaveStart.split('.')[0])
         month = parseInt(leaveStart.split('.')[1])
         year = parseInt(leaveStart.split('.')[2])
-        find.vivaLasVegas.leaveStart = { day, month, year }
+        user.vivaLasVegas.leaveStart = { day, month, year }
 
         dates.leaveStart = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
       } else {
-        const leaveDate = Object.values(find.vivaLasVegas.leaveStart).join('.')
+        const leaveDate = Object.values(user.vivaLasVegas.leaveStart).join('.')
         dates.leaveStart = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
       }
 
@@ -1106,14 +1064,14 @@ module.exports = async (robot) => {
         day = parseInt(leaveEnd.split('.')[0])
         month = parseInt(leaveEnd.split('.')[1])
         year = parseInt(leaveEnd.split('.')[2])
-        find.vivaLasVegas.leaveEnd = { day, month, year }
+        user.vivaLasVegas.leaveEnd = { day, month, year }
         dates.leaveEnd = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
       } else {
-        const leaveDate = Object.values(find.vivaLasVegas.leaveEnd).join('.')
+        const leaveDate = Object.values(user.vivaLasVegas.leaveEnd).join('.')
         dates.leaveEnd = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
       }
 
-      find.vivaLasVegas.requestStatus = APPROVED_STATUS
+      user.vivaLasVegas.requestStatus = APPROVED_STATUS
       msg.send(`Даты отпуска успешно перезаписаны!\n@${username} в отпуске с ${dates.leaveStart} по ${dates.leaveEnd}.`)
     } else {
       msg.send('*Ошибка*. Не удалось найти пользователя.')
@@ -1126,7 +1084,7 @@ module.exports = async (robot) => {
       return
     }
 
-    const users = Object.values(robot.brain.data.users)
+    const users = await routines.getAllUsers(robot)
 
     const formatLine = user => {
       const username = user.name
@@ -1169,7 +1127,7 @@ module.exports = async (robot) => {
   })
 
   robot.respond(/(я )?(болею|заболел)\s*$/i, async msg => {
-    const user = robot.brain.userForId(msg.message.user.id)
+    const user = await routines.findUserById(robot, msg.message.user.id)
 
     // if already sick
     if (user.sick) {
@@ -1191,8 +1149,8 @@ module.exports = async (robot) => {
     msg.send(message)
   })
 
-  robot.respond(/(Болею и работаю|Болею и не работаю)\s*/i, msg => {
-    const user = robot.brain.userForId(msg.message.user.id)
+  robot.respond(/(Болею и работаю|Болею и не работаю)\s*/i, async msg => {
+    const user = await routines.findUserById(msg.message.user.id)
 
     if (user.sick) return
     if (!(typeof user.sickConfirming === 'boolean')) return
@@ -1211,7 +1169,7 @@ module.exports = async (robot) => {
   })
 
   robot.respond(/(Да, они предупреждены, что я болею|Нет, они не предупреждены, что я болею)/i, async msg => {
-    const user = robot.brain.userForId(msg.message.user.id)
+    const user = await routines.findUserById(robot, msg.message.user.id)
     const today = moment()
     const tomorrow = moment().add(1, 'days')
 
@@ -1254,8 +1212,8 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(/(я )?(не болею|выздоровел)\s*/i, msg => {
-    const user = robot.brain.userForId(msg.message.user.id)
+  robot.respond(/(я )?(не болею|выздоровел)\s*/i, async msg => {
+    const user = await routines.findUserById(robot, msg.message.user.id)
 
     if (!user.sick) {
       msg.send('Я ничего не знал о твоей болезни. :thinking:')
