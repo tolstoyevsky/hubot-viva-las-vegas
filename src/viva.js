@@ -47,7 +47,6 @@ module.exports = async (robot) => {
 
   const APPROVED_STATUS = 'approved'
   const PENDING_STATUS = 'pending'
-  const READY_TO_APPLY_STATUS = 'ready-to-apply'
 
   const ANGRY_MSG = 'Давай по порядку!'
   const ACCESS_DENIED_MSG = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
@@ -180,6 +179,13 @@ module.exports = async (robot) => {
     return usernames.indexOf(username) > -1
   }
 
+  function cleanupState (state) {
+    state.n = INIT_STATE
+    delete state.leaveStart
+    delete state.leaveEnd
+    delete state.requestStatus
+  }
+
   function getStateFromBrain (robot, username) {
     const users = robot.brain.usersForFuzzyName(username)
 
@@ -189,14 +195,14 @@ module.exports = async (robot) => {
   }
 
   /**
-   * Check if two specified dates have the same month and day.
+   * Check if two specified dates are the same.
    *
    * @param {moment} firstDate
    * @param {moment} secondsDate
    * @returns {boolean}
    */
-  function isEqualMonthDay (firstDate, secondsDate) {
-    return (firstDate.month() === secondsDate.month()) && (firstDate.date() === secondsDate.date())
+  function isEqualDate (firstDate, secondsDate) {
+    return firstDate.diff(secondsDate, 'days') === 0
   }
 
   function noname (daysNumber) {
@@ -249,13 +255,10 @@ module.exports = async (robot) => {
 
       if (state.requestStatus === APPROVED_STATUS) {
         const yesterday = moment().add(-1, 'day')
-        const userEndVacation = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M')
+        const userEndVacation = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}.${state.leaveEnd.year}`, CREATION_DATE_FORMAT)
 
-        if (isEqualMonthDay(yesterday, userEndVacation)) {
-          state.n = INIT_STATE
-          delete state.leaveStart
-          delete state.leaveEnd
-          delete state.requestStatus
+        if (isEqualDate(yesterday, userEndVacation)) {
+          cleanupState(state)
 
           robot.adapter.sendDirect({ user: { name: user.name } }, 'С возвращением из отпуска!')
         }
@@ -464,7 +467,7 @@ module.exports = async (robot) => {
         if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome) {
           const date = moment(user.vivaLasVegas.dateOfWorkFromHome[1], CREATION_DATE_FORMAT)
 
-          return isEqualMonthDay(today, date)
+          return isEqualDate(today, date)
         }
       })
     let backFromVacation = allUsers
@@ -474,8 +477,7 @@ module.exports = async (robot) => {
           const m = user.vivaLasVegas.leaveEnd.month
           const y = user.vivaLasVegas.leaveEnd.year
           const leaveEnd = moment(`${d}.${m}.${y}`, CREATION_DATE_FORMAT).add(1, 'days')
-
-          return isEqualMonthDay(today, leaveEnd)
+          return isEqualDate(today, leaveEnd)
         }
       })
     let wentOnVacation = allUsers
@@ -486,7 +488,7 @@ module.exports = async (robot) => {
           const y = user.vivaLasVegas.leaveStart.year
           const leaveStart = moment(`${d}.${m}.${y}`, CREATION_DATE_FORMAT)
 
-          return isEqualMonthDay(today, leaveStart)
+          return isEqualDate(today, leaveStart)
         }
       })
     let sickPeople = allUsers.filter(user => user.sick && !user.sick.isWork)
@@ -885,13 +887,8 @@ module.exports = async (robot) => {
     const user = robot.brain.userForName(username)
     const state = getStateFromBrain(robot, username)
 
-    const isRequestStatus = state.requestStatus && state.requestStatus !== READY_TO_APPLY_STATUS
-
     if (state.requestStatus === APPROVED_STATUS) {
-      state.n = INIT_STATE
-      delete state.leaveStart
-      delete state.leaveEnd
-      delete state.requestStatus
+      cleanupState(state)
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
         robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователь @${msg.message.user.name} отменил заявку на отпуск пользователя @${username}.`)
@@ -904,7 +901,7 @@ module.exports = async (robot) => {
 
       robot.adapter.sendDirect({ user: { name: username } }, `Упс, пользователь @${msg.message.user.name} только что отменил твою заявку на отпуск.`)
       msg.send(`Отпуск пользователя @${username} отменен.`)
-    } else if (isRequestStatus) {
+    } else if (state.requestStatus === PENDING_STATUS) {
       msg.send('Отменить можно только одобренные заявки. Используй команду \'отклонить\'.')
     } else {
       msg.send('Этот человек не собирается в отпуск.')
@@ -922,7 +919,6 @@ module.exports = async (robot) => {
     if (checkIfUserExists(robot, username)) {
       const state = getStateFromBrain(robot, username)
       const user = robot.brain.userForName(username)
-      let requestStatus
       let result
 
       if (state.requestStatus !== PENDING_STATUS) {
@@ -933,7 +929,7 @@ module.exports = async (robot) => {
 
       if (action === 'одобрить') {
         result = 'одобрена'
-        requestStatus = APPROVED_STATUS
+        state.requestStatus = APPROVED_STATUS
 
         const start = state.leaveStart
         const leaveStart = moment(
@@ -953,10 +949,8 @@ module.exports = async (robot) => {
         }
       } else {
         result = 'отклонена'
-        requestStatus = READY_TO_APPLY_STATUS
+        cleanupState(state)
       }
-
-      state.requestStatus = requestStatus
 
       if (msg.message.room !== LEAVE_COORDINATION_CHANNEL) {
         const admin = msg.message.user.name
@@ -1033,6 +1027,7 @@ module.exports = async (robot) => {
         dates.leaveEnd = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
       }
 
+      find.vivaLasVegas.requestStatus = APPROVED_STATUS
       msg.send(`Даты отпуска успешно перезаписаны!\n@${username} в отпуске с ${dates.leaveStart} по ${dates.leaveEnd}.`)
     } else {
       msg.send('*Ошибка*. Не удалось найти пользователя.')
@@ -1189,7 +1184,7 @@ module.exports = async (robot) => {
           const startDate = moment(user.sick.start, 'DD.MM.YYYY')
           const yesterday = moment()
 
-          if (isEqualMonthDay(startDate, yesterday)) {
+          if (isEqualDate(startDate, yesterday)) {
             isCalendar = ' Я удалил событие из календаря.'
             return deleteEventFromCalendar(user.sick.eventId)
           } else {
