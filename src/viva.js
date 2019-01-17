@@ -1208,12 +1208,13 @@ module.exports = async (robot) => {
   if (VIVA_REMINDER_SCHEDULER) {
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => sendRemindersToChannel(robot))
 
-    schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => resetLeaveStatus(robot))
-
     schedule.scheduleJob(VIVA_REMINDER_SCHEDULER, () => checkLeaveTimeLeft(robot, 14, 30, 1))
 
     schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => dailySickExtension(robot))
 
+    // Warning: prepareDailyReport should be called before resetLeaveStatus to access unchanged user attrs.
     schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => prepareDailyReport(robot))
+
+    schedule.scheduleJob(VIVA_REPORT_SCHEDULER, () => resetLeaveStatus(robot))
   }
 }
