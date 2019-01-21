@@ -382,7 +382,7 @@ module.exports = async (robot) => {
   async function checkLeaveTimeLeft (robot) {
     const users = Object.values(robot.brain.data.users)
     const sortedUsers = users
-      .filter(users => users.vivaLasVegas.leaveStart && users.vivaLasVegas.requestStatus === APPROVED_STATUS)
+      .filter(users => users.vivaLasVegas && users.vivaLasVegas.leaveStart && users.vivaLasVegas.requestStatus === APPROVED_STATUS)
       .sort((a, b) => sortingByValue(a.vivaLasVegas, b.vivaLasVegas, 'DD.MM.YYYY'))
       .sort((a, b) => sortingByStatus(a.vivaLasVegas, b.vivaLasVegas))
 
@@ -393,12 +393,12 @@ module.exports = async (robot) => {
         const obj = user.vivaLasVegas.leaveStart
         const reportStatus = user.vivaLasVegas.reportToCustomer
         const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
-        const amount = moment(leaveStart.diff(moment())).format('D')
+        const amount = leaveStart.diff(moment(), 'days') + 1
         const days = Object.values(arguments).slice(1)
         const currentDay = days.indexOf(parseInt(amount)) >= 0
 
         if (currentDay) {
-          if ((amount === '1' && !reportStatus) || amount !== '1') {
+          if ((amount === 1 && !reportStatus) || amount !== 1) {
             const emoji = isReport(reportStatus)[0]
             const status = isReport(reportStatus)[1]
             message.push(`${emoji} @${user.name} уходит в отпуск через ${noname(amount)}. Заказчик ${status}`)
