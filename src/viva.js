@@ -54,12 +54,7 @@ module.exports = async (robot) => {
 
   const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/, 'i')
 
-  // Checking if the bot is in the channel specified via the LEAVE_COORDINATION_CHANNEL environment variable.
-  const botChannels = await robot.adapter.api.get('channels.list.joined')
-  const botGroups = await robot.adapter.api.get('groups.list')
-  const chExists = botChannels.channels.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
-  const grExists = botGroups.groups.filter(item => item.name === LEAVE_COORDINATION_CHANNEL).length
-  if (!chExists && !grExists) {
+  if (!(await routines.isBotInRoom(robot, LEAVE_COORDINATION_CHANNEL))) {
     routines.rave(robot, `Hubot is not in the group or channel named '${LEAVE_COORDINATION_CHANNEL}'`)
     return
   }
