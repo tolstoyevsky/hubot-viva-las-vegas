@@ -1172,7 +1172,7 @@ module.exports = async (robot) => {
     const user = robot.brain.userForId(msg.message.user.id)
 
     if (!user.sick) {
-      msg.send('А ты разве болеешь?')
+      msg.send('Я ничего не знал о твоей болезни. :thinking:')
 
       return
     }
@@ -1197,6 +1197,10 @@ module.exports = async (robot) => {
 
           msg.send(`Рад видеть тебя снова!${isCalendar}`)
         })
+    } else if (user.sick) {
+      delete user.sick
+
+      msg.send(`Рад видеть тебя снова!`)
     }
   })
 
