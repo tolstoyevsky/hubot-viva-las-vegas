@@ -431,18 +431,12 @@ module.exports = async (robot) => {
    * @returns {boolean | string}
    */
   function adverbToDate (adverb, format) {
-    let day = moment()
-    let date
-    let month
-
     if (adverb === 'сегодня') {
-      return day.format(format)
+      return moment().format(format)
     }
 
     if (adverb === 'завтра') {
-      date = moment(day, DATE_FORMAT).date() + 1
-      month = moment(day, DATE_FORMAT).month() + 1
-      return moment(`${date}.${month}`, DATE_FORMAT).format(format)
+      return moment().add(1, 'days').format(format)
     }
 
     return false
