@@ -453,6 +453,7 @@ module.exports = async (robot) => {
     const allUsers = Object.values(robot.brain.data.users)
     const informer = {}
     const today = moment()
+    if ([6, 0].includes(today.day())) return
     let workFromHome = allUsers
       .filter(user => {
         if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome) {
