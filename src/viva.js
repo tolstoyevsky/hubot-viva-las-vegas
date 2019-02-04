@@ -291,8 +291,8 @@ module.exports = async (robot) => {
           resolve(response)
         }
       })
-    }).catch(() => {
-      routines.rave(robot, 'An error occurred when attempting to add an event to the calendar.')
+    }).catch((err) => {
+      routines.rave(robot, `An error occurred when attempting to add an event to the calendar.\n${err.message}`)
     })
 
     if (result) {
@@ -313,7 +313,7 @@ module.exports = async (robot) => {
       eventId: eventId
     }, (err) => {
       if (err) {
-        routines.rave(robot, 'An error occurred when attempting to delete an event from the calendar.')
+        routines.rave(robot, `An error occurred when attempting to delete an event from the calendar.\n${err.message}`)
       }
     })
   }
@@ -327,8 +327,8 @@ module.exports = async (robot) => {
     return GOOGLE_CALENDAR.events.get({
       calendarId: GOOGLE_CALENDAR_ID,
       eventId
-    }).catch(() => {
-      routines.rave(robot, 'An error occurred when attempting to get an event from the calendar.')
+    }).catch((err) => {
+      routines.rave(robot, `An error occurred when attempting to get an event from the calendar.\n${err.message}`)
     })
   }
 
@@ -343,8 +343,8 @@ module.exports = async (robot) => {
       calendarId: GOOGLE_CALENDAR_ID,
       eventId,
       resource
-    }).catch(() => {
-      routines.rave(robot, 'An error occurred when attempting to update an event from the calendar.')
+    }).catch((err) => {
+      routines.rave(robot, `An error occurred when attempting to update an event from the calendar.\n${err.message}`)
     })
   }
 
