@@ -197,7 +197,9 @@ module.exports = async (robot) => {
    * @returns {boolean}
    */
   function isEqualDate (firstDate, secondsDate) {
-    return firstDate.diff(secondsDate, 'days') === 0
+    const a = moment(firstDate.format(CREATION_DATE_FORMAT), CREATION_DATE_FORMAT)
+    const b = moment(secondsDate.format(CREATION_DATE_FORMAT), CREATION_DATE_FORMAT)
+    return a.diff(b, 'days') === 0
   }
 
   function noname (daysNumber) {
