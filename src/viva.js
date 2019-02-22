@@ -9,6 +9,7 @@
 //    hubot болею - sets the status of being ill and adds the corresponding event to the calendar
 //    hubot не болею - removes status of being ill and stops the prolongation of the corresponding event in the calendar
 //    begin admin
+//      hubot @username хочет в отпуск - initiates a new leave request on behalf of the specified user
 //      hubot одобрить заявку @username - approves the leave request for the specified user
 //      hubot отклонить заявку @username - rejects the leave request for the specified user
 //      hubot отменить заявку @username - cancels the approved leave request for the specified user
@@ -50,7 +51,9 @@ module.exports = async (robot) => {
 
   const ANGRY_MSG = 'Давай по порядку!'
   const ACCESS_DENIED_MSG = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
+  const CONFUSED_MSG = 'Я не понимаю, о чем ты. :shrug:'
   const INVALID_DATE_MSG = 'Указанная дата является невалидной. Попробуй еще раз.'
+  const UNKNOWN_USER_MSG = 'Пользователя с таким именем нет или я его просто не знаю, т.к. он ни разу не говорил со мной.'
 
   const regExpMonthYear = new RegExp(/(сегодня|завтра|((\d{1,2})\.(\d{1,2})))\s*$/, 'i')
 
@@ -68,8 +71,8 @@ module.exports = async (robot) => {
 
   const statesMessages = Object.freeze([
     '',
-    `C какого числа ты хочешь уйти в отпуск? (${USER_FRIENDLY_DATE_FORMAT})`,
-    `До какого числа ты планируешь быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
+    `C какого числа %s уйти в отпуск? (${USER_FRIENDLY_DATE_FORMAT})`,
+    `До какого числа %s быть в отпуске? (${USER_FRIENDLY_DATE_FORMAT})`,
     'Отправить текущую заявку в HR-отдел?'
   ])
 
@@ -559,10 +562,31 @@ module.exports = async (robot) => {
     }
   }
 
-  robot.respond(/хочу в отпуск\s*/i, function (msg) {
-    const state = getStateFromBrain(robot, msg.message.user.name)
+  robot.respond(/(хочу в отпуск)|(@?(.+) хочет в отпуск)\s*/i, async function (msg) {
+    const username = msg.match[1] ? msg.message.user.name : msg.match[3]
+    const user = await routines.findUserByName(robot, username)
+
+    if (!user) {
+      msg.send(UNKNOWN_USER_MSG)
+      return
+    }
+
+    user.vivaLasVegas = user.vivaLasVegas || {}
+    const state = user.vivaLasVegas
+
+    if (msg.match[2]) { // @username хочет в отпуск
+      const admin = await routines.findUserByName(robot, msg.message.user.name)
+      admin.vivaLasVegas = admin.vivaLasVegas || {}
+      admin.vivaLasVegas.allocation = username
+
+      if (!await routines.isAdmin(robot, admin.name)) {
+        msg.send(ACCESS_DENIED_MSG)
+        return
+      }
+    }
 
     if (state.n !== undefined && state.n !== INIT_STATE && state.n < CONFIRM_STATE) {
+      const appeal = msg.match[1] ? 'ты хочешь' : `@${username} хочет`
       const leaveStart = state.leaveStart
       const leaveEnd = state.leaveEnd
       let infoMessage
@@ -573,11 +597,11 @@ module.exports = async (robot) => {
           break
         }
         case 2: {
-          infoMessage = `\nИтак, ты хочешь в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')}.\n`
+          infoMessage = `\nИтак, ${appeal} в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')}.\n`
           break
         }
         case 3: {
-          infoMessage = `\nИтак, ты хочешь уйти в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')} по ${moment(`${leaveEnd.day}.${leaveEnd.month}`, DATE_FORMAT).format('DD.MM')}.\n`
+          infoMessage = `\nИтак, ${appeal} уйти в отпуск с ${moment(`${leaveStart.day}.${leaveStart.month}`, DATE_FORMAT).format('DD.MM')} по ${moment(`${leaveEnd.day}.${leaveEnd.month}`, DATE_FORMAT).format('DD.MM')}.\n`
           break
         }
       }
@@ -586,26 +610,35 @@ module.exports = async (robot) => {
         const message = routines.buildMessageWithButtons(
           `${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`,
           [
-            ['Да', 'Да, планирую'],
-            ['Нет', 'Нет, не планирую']
+            ['Да', msg.match[1] ? 'Да, планирую' : 'Да, планирует'],
+            ['Нет', msg.match[1] ? 'Нет, не планирую' : 'Нет, не планирует']
           ]
         )
         msg.send(message)
       } else {
-        msg.send(`${ANGRY_MSG}${infoMessage}${statesMessages[state.n]}`)
+        const message = statesMessages[state.n].replace('%s', appeal)
+        msg.send(`${ANGRY_MSG}${infoMessage}${message}`)
       }
 
       return
     }
 
     if (state.requestStatus === APPROVED_STATUS) {
-      msg.send('Твоя предыдущая заявка была одобрена, так что сначала отгуляй этот отпуск.')
+      if (msg.match[2]) { // @username хочет в отпуск
+        msg.send('Заявка этого пользователя уже была одобрена.')
+      } else {
+        msg.send('Твоя предыдущая заявка была одобрена, так что сначала отгуляй этот отпуск.')
+      }
 
       return
     }
 
     if (state.requestStatus === PENDING_STATUS) {
-      msg.send('Твоя заявка на отпуск уже отправлена. Дождись ответа.')
+      if (msg.match[2]) { // @username хочет в отпуск
+        msg.send('У этого пользователя уже есть заявка на отпуск.')
+      } else {
+        msg.send('Твоя заявка на отпуск уже отправлена. Дождись ответа.')
+      }
 
       return
     }
@@ -652,10 +685,13 @@ module.exports = async (robot) => {
     }
   })
 
-  robot.respond(regExpMonthYear, function (msg) {
+  robot.respond(regExpMonthYear, async function (msg) {
     const adverb = adverbToDate(msg.match[1].toLowerCase(), OUTPUT_DATE_FORMAT)
     const date = adverb || moment(msg.match[2], DATE_FORMAT).format(OUTPUT_DATE_FORMAT)
-    const state = getStateFromBrain(robot, msg.message.user.name)
+    const customer = await routines.findUserByName(robot, msg.message.user.name)
+    const state = customer.vivaLasVegas.allocation
+      ? (await routines.findUserByName(robot, customer.vivaLasVegas.allocation)).vivaLasVegas
+      : customer.vivaLasVegas
 
     let day = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).date()) || parseInt(msg.match[3])
     let month = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).month()) + 1 || parseInt(msg.match[4])
@@ -667,13 +703,13 @@ module.exports = async (robot) => {
     }
 
     if (state.n === FROM_STATE) {
-      const today = moment()
+      const today = moment().startOf('day')
       // moment().month() starts counting with 0
       const currentMonth = today.month() + 1
       let year
 
       if (currentMonth === month) {
-        if (today.date() >= day) {
+        if (today.date() > day) {
           year = today.year() + 1
         } else {
           year = today.year()
@@ -684,14 +720,27 @@ module.exports = async (robot) => {
         year = today.year()
       }
 
-      const startDay = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
-      const daysBefore = startDay.diff(today, 'days')
+      if (!customer.vivaLasVegas.allocation) {
+        const startDay = moment(`${day}.${month}.${year}`, 'D.M.YYYY')
+        const daysBefore = startDay.diff(today, 'days')
 
-      if (daysBefore < MINIMUM_DAYS_BEFORE_REQUEST) {
-        const minDate = today.add(MINIMUM_DAYS_BEFORE_REQUEST, 'd').format('DD.MM.YYYY')
-        const duration = daysBefore ? `только через ${noname(daysBefore)}` : `уже завтра`
-        msg.send(`Нужно запрашивать отпуск минимум за ${noname(MINIMUM_DAYS_BEFORE_REQUEST)}, а твой - ${duration}. Попробуй выбрать дату позднее ${minDate}.`)
-        return
+        if (daysBefore < MINIMUM_DAYS_BEFORE_REQUEST) {
+          const minDate = today.add(MINIMUM_DAYS_BEFORE_REQUEST, 'd').format('DD.MM.YYYY')
+          let duration
+          switch (daysBefore) {
+            case 0:
+              duration = 'уже сегодня'
+              break
+            case 1:
+              duration = 'уже завтра'
+              break
+            default:
+              duration = `только через ${noname(daysBefore)}`
+              break
+          }
+          msg.send(`Нужно запрашивать отпуск минимум за ${noname(MINIMUM_DAYS_BEFORE_REQUEST)}, а твой - ${duration}. Попробуй выбрать дату позднее ${minDate}.`)
+          return
+        }
       }
 
       const leaveStart = {}
@@ -709,6 +758,9 @@ module.exports = async (robot) => {
     }
 
     if (state.n === TO_STATE) {
+      const appeal = customer.vivaLasVegas.allocation
+        ? `@${customer.vivaLasVegas.allocation} планирует`
+        : 'ты планируешь'
       const leaveStart = state.leaveStart
       const leaveEnd = {}
 
@@ -745,10 +797,10 @@ module.exports = async (robot) => {
       state.n = CONFIRM_STATE
 
       const buttonsMessage = routines.buildMessageWithButtons(
-        `Значит ты планируешь находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно?`,
+        `Значит ${appeal} находиться в отпуске ${noname(daysNumber)}${withWeekends}. Все верно?`,
         [
-          ['Да', 'Да, планирую'],
-          ['Нет', 'Нет, не планирую']
+          ['Да', customer.vivaLasVegas.allocation ? 'Да, планирует' : 'Да, планирую'],
+          ['Нет', customer.vivaLasVegas.allocation ? 'Нет, не планирует' : 'Нет, не планирую']
         ]
       )
 
@@ -785,6 +837,49 @@ module.exports = async (robot) => {
       )
       msg.send(buttonsMessage)
     }
+  })
+
+  robot.respond(/(Да, планирует|Нет, не планирует)\s*/i, async msg => {
+    const answer = msg.match[1].toLowerCase().trim()
+    const customer = await routines.findUserByName(robot, msg.message.user.name)
+
+    if (!customer.vivaLasVegas.allocation) {
+      msg.send(CONFUSED_MSG)
+      return
+    }
+
+    const user = await routines.findUserByName(robot, customer.vivaLasVegas.allocation)
+    const state = user.vivaLasVegas
+
+    if (state.n !== CONFIRM_STATE) {
+      msg.send(CONFUSED_MSG)
+      return
+    }
+
+    if (answer === 'да, планирует') {
+      const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M').format('DD.MM')
+      const to = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M').format('DD.MM')
+
+      state.requestStatus = APPROVED_STATUS
+      state.reportToCustomer = false
+
+      const message = `Пользователем @${customer.name} только что создана заявка на отпуск @${user.name} c ${from} по ${to}.`
+      robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message)
+      msg.send(`Заявка на отпуск для пользователя @${user.name} создана и одобрена.`)
+      const question = routines.buildMessageWithButtons(
+        `Привет, тебе оформлен отпуск с ${from} по ${to}. Заказчик предупрежден?`,
+        [
+          ['Да', 'Да, предупрежден'],
+          ['Нет', 'Нет, не предупрежден']
+        ]
+      )
+      robot.adapter.sendDirect({ user: { name: user.name } }, question)
+    } else if (answer === 'нет, не планирует') {
+      msg.send('Я прервал процесс формирования заявки на отпуск.')
+    }
+
+    delete state.n
+    delete customer.vivaLasVegas.allocation
   })
 
   robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, msg => {
@@ -953,7 +1048,7 @@ module.exports = async (robot) => {
 
       robot.adapter.sendDirect({ user: { name: username } }, `Заявка на отпуск ${result}.`)
     } else {
-      msg.send('Пользователя с таким именем нет или я его просто не знаю, т.к. он ни разу не говорил со мной.')
+      msg.send(UNKNOWN_USER_MSG)
     }
   })
 
