@@ -781,7 +781,7 @@ module.exports = async (robot) => {
         withWeekends = ' (учитывая выходные)'
       }
 
-      const daysNumber = d2.diff(d1, 'days')
+      const daysNumber = d2.diff(d1, 'days') + 1
 
       if (daysNumber > MAXIMUM_LENGTH_OF_LEAVE) {
         msg.send(`Отпуск продолжительностью ${noname(daysNumber)} выглядит круто (особенно если он оплачиваемый :joy:), но ты можешь претендовать максимум на ${noname(MAXIMUM_LENGTH_OF_LEAVE)}.`)
