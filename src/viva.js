@@ -857,17 +857,29 @@ module.exports = async (robot) => {
     }
 
     if (answer === 'да, планирует') {
-      const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M').format('DD.MM')
-      const to = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M').format('DD.MM')
+      const from = moment(`${state.leaveStart.day}.${state.leaveStart.month}`, 'D.M')
+      const to = moment(`${state.leaveEnd.day}.${state.leaveEnd.month}`, 'D.M')
 
       state.requestStatus = APPROVED_STATUS
       state.reportToCustomer = false
 
-      const message = `Пользователем @${customer.name} только что создана заявка на отпуск @${user.name} c ${from} по ${to}.`
+      let googleEvent = ''
+
+      if (GOOGLE_API) {
+        const startDay = from.format('YYYY-MM-DD')
+        const endDay = to.add(1, 'day').format('YYYY-MM-DD')
+
+        const eventId = await addEventToCalendar(startDay, endDay, user, GOOGLE_EVENT_VACATION)
+
+        state.eventId = eventId
+        googleEvent = 'Событие добавлено в календарь.'
+      }
+
+      const message = `Пользователем @${customer.name} только что создана заявка на отпуск @${user.name} c ${from.format('DD.MM')} по ${to.format('DD.MM')}.`
       robot.messageRoom(LEAVE_COORDINATION_CHANNEL, message)
-      msg.send(`Заявка на отпуск для пользователя @${user.name} создана и одобрена.`)
+      msg.send(`Заявка на отпуск для пользователя @${user.name} создана и одобрена. ${googleEvent}`)
       const question = routines.buildMessageWithButtons(
-        `Привет, тебе оформлен отпуск с ${from} по ${to}. Заказчик предупрежден?`,
+        `Привет, тебе оформлен отпуск с ${from.format('DD.MM')} по ${to.format('DD.MM')}. Заказчик предупрежден?`,
         [
           ['Да', 'Да, предупрежден'],
           ['Нет', 'Нет, не предупрежден']
