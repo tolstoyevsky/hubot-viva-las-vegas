@@ -9,6 +9,7 @@
 //    hubot болею - sets the status of being ill and adds the corresponding event to the calendar
 //    hubot не болею - removes status of being ill and stops the prolongation of the corresponding event in the calendar
 //    begin admin
+//      hubot @username хочет отгул - initiates a new time off request for the specified user
 //      hubot @username хочет в отпуск - initiates a new leave request on behalf of the specified user
 //      hubot одобрить заявку @username - approves the leave request for the specified user
 //      hubot отклонить заявку @username - rejects the leave request for the specified user
@@ -273,7 +274,7 @@ module.exports = async (robot) => {
    * @param {String} end
    * @param {Object} user
   */
-  async function addEventToCalendar (start, end, user, type) {
+  async function addEventToCalendar (start, end, user, type, description) {
     // Google API date format YYYY-MM-DD
     let event = {
       summary: `${type} (${user.name})`,
@@ -283,6 +284,10 @@ module.exports = async (robot) => {
       end: {
         date: `${end}`
       }
+    }
+
+    if (description) {
+      event.description = description
     }
 
     const result = await new Promise((resolve, reject) => {
@@ -494,12 +499,21 @@ module.exports = async (robot) => {
       })
     let sickPeople = allUsers.filter(user => user.sick && !user.sick.isWork)
     let sickPeopleWorkHome = allUsers.filter(user => user.sick && user.sick.isWork)
+    let timeOffPeople = allUsers.filter(user => {
+      if (user.timeOff && user.timeOff.list) {
+        const today = moment().format('DD.MM.YYYY')
+        const result = user.timeOff.list.find(item => item.date === today)
+        user.timeOff.list = user.timeOff.list.filter(item => item.date !== today)
+        return result
+      }
+    })
 
     informer[`Из дома работа${workFromHome.length > 1 ? 'ют' : 'ет'}`] = workFromHome
     informer[`${wentOnVacation.length > 1 ? 'Ушли' : 'Пользователь ушел'} в отпуск`] = wentOnVacation
     informer[`${backFromVacation.length > 1 ? 'Вернулись' : 'Пользователь вернулся'} из отпуска`] = backFromVacation
     informer[`Боле${sickPeople.length > 1 ? 'ют' : 'ет'}`] = sickPeople
     informer[`Боле${sickPeopleWorkHome.length > 1 ? 'ют' : 'ет'} (работа из дома)`] = sickPeopleWorkHome
+    informer[`${timeOffPeople.length > 1 ? 'Взяли' : 'Пользователь взял'} отгул`] = timeOffPeople
     // Form mesage
     const message = []
     for (const key in informer) {
@@ -695,6 +709,7 @@ module.exports = async (robot) => {
     const adverb = adverbToDate(msg.match[1].toLowerCase(), OUTPUT_DATE_FORMAT)
     const date = adverb || moment(msg.match[2], DATE_FORMAT).format(OUTPUT_DATE_FORMAT)
     const customer = await routines.findUserByName(robot, msg.message.user.name)
+    customer.vivaLasVegas = customer.vivaLasVegas || {}
     const state = customer.vivaLasVegas.allocation
       ? (await routines.findUserByName(robot, customer.vivaLasVegas.allocation)).vivaLasVegas
       : customer.vivaLasVegas
@@ -702,13 +717,60 @@ module.exports = async (robot) => {
     let day = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).date()) || parseInt(msg.match[3])
     let month = parseInt(moment(adverb, OUTPUT_DATE_FORMAT).month()) + 1 || parseInt(msg.match[4])
 
-    if ([FROM_STATE, TO_STATE].includes(state.n) && !routines.isValidDate(date, DATE_FORMAT)) {
+    if (!routines.isValidDate(date, DATE_FORMAT)) {
       msg.send(INVALID_DATE_MSG)
 
       return
     }
 
-    if (state.n === FROM_STATE) {
+    if (customer.timeOff && customer.timeOff.allocation) {
+      const candidate = await routines.findUserByName(robot, customer.timeOff.allocation)
+
+      const date = moment(msg.match[2], DATE_FORMAT)
+      if (date.isBefore(moment())) {
+        date.year(date.year() + 1)
+      }
+
+      let messageText = ''
+
+      candidate.timeOff.list = candidate.timeOff.list || []
+
+      if (!candidate.timeOff.list.find(item => !item.type)) {
+        const date = moment(msg.match[2], DATE_FORMAT)
+
+        if (date.isBefore(moment().startOf('day'))) {
+          date.year(date.year() + 1)
+        }
+
+        if (candidate.timeOff.list.find(item => item.date === date.format('DD.MM.YYYY'))) {
+          delete customer.timeOff.allocation
+          return msg.send(`У пользователя @${candidate.name} уже намечен отгул на ${date.format('DD.MM')}`)
+        } else {
+          candidate.timeOff.list.push({
+            date: date.format('DD.MM.YYYY'),
+            type: null
+          })
+        }
+        messageText = `Отлично. Значит @${candidate.name} берет отгул ${date.format('DD.MM')}. `
+      } else {
+        const user = msg.message.user
+        messageText = `Давай по порядку. @${user.timeOff.allocation} берет отгул *${candidate.timeOff.list[0].date}*. `
+      }
+
+      messageText += 'Какой это будет отгул?'
+
+      const message = routines.buildMessageWithButtons(
+        messageText,
+        [
+          ['Отгул с отработкой', 'С отработкой'],
+          ['Отгул за свой счет', 'За свой счет'],
+          ['Отгул в счет отпуска', 'В счет отпуска'],
+          ['Отмена', 'Отгул не нужен']
+        ]
+      )
+
+      msg.send(message)
+    } else if (state.n === FROM_STATE) {
       const today = moment().startOf('day')
       // moment().month() starts counting with 0
       const currentMonth = today.month() + 1
@@ -759,11 +821,7 @@ module.exports = async (robot) => {
       state.n = TO_STATE
 
       msg.send(`Отлично, по какое? (${USER_FRIENDLY_DATE_FORMAT})`)
-
-      return
-    }
-
-    if (state.n === TO_STATE) {
+    } else if (state.n === TO_STATE) {
       const appeal = customer.vivaLasVegas.allocation
         ? `@${customer.vivaLasVegas.allocation} планирует`
         : 'ты планируешь'
@@ -811,9 +869,7 @@ module.exports = async (robot) => {
       )
 
       msg.send(buttonsMessage)
-    }
-
-    if (state.n === WAITING_DATE_STATE) {
+    } else if (state.n === WAITING_DATE_STATE) {
       const dateOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
       switch (dateOfWorkFromHome.checkDate(date)) {
         case 1:
@@ -1306,6 +1362,113 @@ module.exports = async (robot) => {
 
       msg.send(`Рад видеть тебя снова!`)
     }
+  })
+
+  robot.respond(/(@?(.+) хочет отгул)\s*/i, async msg => {
+    const user = msg.message.user
+    const username = msg.match[2]
+    const candidate = await routines.findUserByName(robot, username)
+
+    if (!await routines.isAdmin(robot, user.name)) return msg.send(ACCESS_DENIED_MSG)
+
+    if (!candidate) return msg.send(UNKNOWN_USER_MSG)
+
+    if (user.timeOff && user.timeOff.allocation) {
+      const correctUser = await routines.findUserByName(robot, user.timeOff.allocation)
+      if (!correctUser.timeOff.list || !correctUser.timeOff.list.find(user => !user.type)) {
+        return msg.send(
+          `Дaвай по порядку. Какого числа @${correctUser.name} хочет взять отгул?`
+        )
+      } else {
+        const date = correctUser.timeOff.list.find(item => !item.type).date
+        return msg.send(routines.buildMessageWithButtons(
+          `Дaвай по порядку. Какой отгул хочет взять @${correctUser.name} ${date}?`,
+          [
+            ['Отгул с отработкой', 'С отработкой'],
+            ['Отгул за свой счет', 'За свой счет'],
+            ['Отгул в счет отпуска', 'В счет отпуска'],
+            ['Отмена', 'Отгул не нужен']
+          ]
+        ))
+      }
+    }
+
+    candidate.timeOff = candidate.timeOff || {}
+    user.timeOff = user.timeOff || {}
+
+    user.timeOff.allocation = username
+
+    msg.send(`Когда @${candidate.name} хочет взять отгул?`)
+  })
+
+  robot.respond(/(с отработкой)|(за свой счет)|(в счет отпуска)\s*/i, async msg => {
+    const errorMsg = 'Я не знал, что пользователь собирался брать отгул. Если хочешь сообщить об отгуле, скажи @username хочет отгул.'
+    const user = msg.message.user
+
+    if (!user.timeOff || !user.timeOff.allocation) {
+      return msg.send(errorMsg)
+    }
+
+    const candidate = await routines.findUserByName(robot, user.timeOff.allocation)
+
+    candidate.timeOff = candidate.timeOff || {}
+    candidate.timeOff.list = candidate.timeOff.list || []
+
+    if (!candidate.timeOff.list.find(item => !item.type)) {
+      return msg.send(errorMsg)
+    }
+
+    const start = moment(candidate.timeOff.list.find(item => !item.type))
+      .format('YYYY-MM-DD')
+
+    const end = moment(start, 'YYYY-MM-DD')
+      .add(1, 'day')
+      .format('YYYY-MM-DD')
+
+    const timeOffType = (msg.match[1] || msg.match[2] || msg.match[3]).toLowerCase()
+    const description = `Отгул ${timeOffType}`
+    const date = candidate.timeOff.list.find(item => !item.type).date
+
+    addEventToCalendar(
+      start,
+      end,
+      candidate,
+      'Отгул',
+      description
+    )
+
+    candidate.timeOff.list.find(item => !item.type).type = timeOffType
+    delete user.timeOff.allocation
+
+    msg.send(`Отлично. Значит @${candidate.name} берет отгул ${timeOffType} ${date}.`)
+    robot.messageRoom(LEAVE_COORDINATION_CHANNEL, `Пользователем @${user.name} только что оформлен отгул ${timeOffType} для @${candidate.name} на ${date}.`)
+  })
+
+  robot.respond(/(отгул не нужен)\s*/i, async msg => {
+    const errorMsg = 'Этот пользователь и не собирался брать отгул.'
+    const user = msg.message.user
+
+    if (!user.timeOff || !user.timeOff.allocation) {
+      return msg.send(errorMsg)
+    }
+
+    const candidate = await routines.findUserByName(
+      robot,
+      user.timeOff.allocation
+    )
+
+    if (!candidate.timeOff.list.find(item => !item.type)) {
+      return msg.send(errorMsg)
+    }
+
+    // Deleting all nullable type attribute
+    candidate.timeOff.list = candidate.timeOff.list.filter(item => {
+      return item.type
+    })
+
+    delete user.timeOff.allocation
+
+    msg.send(`Отгул для @${candidate.name} отменен.`)
   })
 
   if (VIVA_REMINDER_SCHEDULER) {
