@@ -483,12 +483,6 @@ module.exports = async (robot) => {
       })
     let wentOnVacation = allUsers
       .filter(user => {
-        // It sometimes happened that leaveEnd is undefined.
-        if (!user.vivaLasVegas.leaveEnd) {
-          robot.logger.error(`In wentOnVacation leaveEnd attribute of @${user.name} is missing.`)
-          robot.logger.error(JSON.stringify(user))
-          return false
-        }
         if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
           const d = user.vivaLasVegas.leaveStart.day
           const m = user.vivaLasVegas.leaveStart.month
