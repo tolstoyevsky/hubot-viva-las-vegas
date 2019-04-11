@@ -1,7 +1,7 @@
-const { Stack } = require('./../stack')
+const { Stack } = require('../../stack')
 
-const vars = require('./../vars')
-const utils = require('./../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
 module.exports = async function (msg) {
   const state = await utils.getStateFromBrain(msg.robot, msg.message.user.name)

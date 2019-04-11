@@ -1,8 +1,8 @@
 const moment = require('moment')
 const routines = require('hubot-routines')
 
-const vars = require('../vars')
-const utils = require('../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
 module.exports = async msg => {
   const answer = msg.match[1].toLowerCase().trim()

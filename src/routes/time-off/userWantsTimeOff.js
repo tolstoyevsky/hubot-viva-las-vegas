@@ -1,6 +1,6 @@
 const routines = require('hubot-routines')
 
-const vars = require('./../vars')
+const vars = require('../../vars')
 
 module.exports = async msg => {
   const user = msg.message.user

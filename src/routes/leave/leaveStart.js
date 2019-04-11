@@ -1,8 +1,8 @@
 const routines = require('hubot-routines')
 const moment = require('moment')
 
-const vars = require('./../vars')
-const utils = require('./../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
 module.exports = async function (msg) {
   const username = msg.match[1] ? msg.message.user.name : msg.match[3]

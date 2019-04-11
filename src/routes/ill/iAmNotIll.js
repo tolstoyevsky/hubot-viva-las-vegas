@@ -1,7 +1,7 @@
 const moment = require('moment')
 
-const vars = require('./../vars')
-const utils = require('./../utils')
+const vars = require('./../../vars')
+const utils = require('./../../utils')
 
 module.exports = msg => {
   const user = msg.message.user

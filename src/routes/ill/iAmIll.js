@@ -3,7 +3,7 @@ const routines = require('hubot-routines')
 module.exports = async msg => {
   const user = msg.message.user
 
-  // if already sick
+  // if already ill
   if (user.sick) {
     msg.send('Я уже слышал, что ты болеешь. :thinking:')
 

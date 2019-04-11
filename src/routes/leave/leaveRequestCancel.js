@@ -1,7 +1,7 @@
 const routines = require('hubot-routines')
 
-const vars = require('../vars')
-const utils = require('../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
 module.exports = async (msg) => {
   if (!await routines.isAdmin(msg.robot, msg.message.user.name)) {

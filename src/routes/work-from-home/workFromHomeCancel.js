@@ -1,9 +1,9 @@
 const routines = require('hubot-routines')
 
-const vars = require('./../vars')
-const utils = require('./../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
-const { Stack } = require('./../stack')
+const { Stack } = require('../../stack')
 
 module.exports = async (msg) => {
   const state = await utils.getStateFromBrain(msg.robot, msg.message.user.name)

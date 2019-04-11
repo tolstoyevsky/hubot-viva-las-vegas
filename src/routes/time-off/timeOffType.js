@@ -1,8 +1,8 @@
 const moment = require('moment')
 const routines = require('hubot-routines')
 
-const vars = require('./../vars')
-const utils = require('./../utils')
+const vars = require('../../vars')
+const utils = require('../../utils')
 
 module.exports = async msg => {
   const errorMsg = 'Я не знал, что пользователь собирался брать отгул. Если хочешь сообщить об отгуле, скажи @username хочет отгул.'
