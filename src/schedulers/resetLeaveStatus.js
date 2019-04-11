@@ -1,5 +1,7 @@
 const moment = require('moment')
 
+const routines = require('hubot-routines')
+
 const vars = require('./../vars')
 const utils = require('./../utils')
 
@@ -10,9 +12,9 @@ const utils = require('./../utils')
  * @returns {Void}
  */
 module.exports = async (robot) => {
-  const users = robot.brain.data.users
+  const users = await routines.getAllUsers(robot)
 
-  for (const user of Object.values(users)) {
+  for (const user of users) {
     const state = await utils.getStateFromBrain(robot, user.name)
 
     if (state.requestStatus === vars.APPROVED_STATUS) {
