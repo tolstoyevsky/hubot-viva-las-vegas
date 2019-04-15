@@ -23,29 +23,47 @@ module.exports = (robot) => {
     })
   let backFromVacation = allUsers
     .filter(user => {
-      if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
-        // It sometimes happened that leaveEnd is undefined.
-        if (!user.vivaLasVegas.leaveEnd) {
-          robot.logger.error(`In backFromVacation leaveEnd attribute of @${user.name} is missing.`)
-          robot.logger.error(JSON.stringify(user))
-          return false
+      if (!user.vivaLasVegas || !user.vivaLasVegas.leaveStart) {
+        return false
+      }
+      // It sometimes happened that leaveEnd is undefined.
+      if (!user.vivaLasVegas.leaveEnd) {
+        robot.logger.error(`In backFromVacation leaveEnd attribute of @${user.name} is missing.`)
+        robot.logger.error(JSON.stringify(user))
+        return false
+      }
+      const d = user.vivaLasVegas.leaveEnd.day
+      const m = user.vivaLasVegas.leaveEnd.month
+      const y = user.vivaLasVegas.leaveEnd.year
+      const leaveEnd = moment(`${d}.${m}.${y}`, vars.CREATION_DATE_FORMAT).add(1, 'days')
+      if (utils.isEqualDate(today, leaveEnd)) {
+        if (user.vivaLasVegas.requestStatus === vars.APPROVED_STATUS) {
+          return true
+        } else {
+          delete user.vivaLasVegas.leaveStart
         }
-        const d = user.vivaLasVegas.leaveEnd.day
-        const m = user.vivaLasVegas.leaveEnd.month
-        const y = user.vivaLasVegas.leaveEnd.year
-        const leaveEnd = moment(`${d}.${m}.${y}`, vars.CREATION_DATE_FORMAT).add(1, 'days')
-        return utils.isEqualDate(today, leaveEnd)
       }
     })
   let wentOnVacation = allUsers
     .filter(user => {
-      if (user.vivaLasVegas && user.vivaLasVegas.leaveStart) {
-        const d = user.vivaLasVegas.leaveStart.day
-        const m = user.vivaLasVegas.leaveStart.month
-        const y = user.vivaLasVegas.leaveStart.year
-        const leaveStart = moment(`${d}.${m}.${y}`, vars.CREATION_DATE_FORMAT)
-
-        return utils.isEqualDate(today, leaveStart)
+      if (!user.vivaLasVegas || !user.vivaLasVegas.leaveStart) {
+        return false
+      }
+      const d = user.vivaLasVegas.leaveStart.day
+      const m = user.vivaLasVegas.leaveStart.month
+      const y = user.vivaLasVegas.leaveStart.year
+      const leaveStart = moment(`${d}.${m}.${y}`, vars.CREATION_DATE_FORMAT)
+      if (utils.isEqualDate(today, leaveStart)) {
+        if (user.vivaLasVegas.requestStatus === vars.APPROVED_STATUS) {
+          return true
+        } else if (user.vivaLasVegas.requestStatus === vars.PENDING_STATUS) {
+          delete user.vivaLasVegas.requestStatus
+          robot.adapter.sendDirect(
+            { user: { name: user.name } },
+            `Твоя заявка на отпуск с ${leaveStart.format('DD.MM')} была удалена, так как до сих пор не была одобрена. Теперь ты можешь составить новую заявку на отпуск.`
+          )
+        }
+        delete user.vivaLasVegas.leaveStart
       }
     })
   let sickPeople = allUsers.filter(user => user.sick && !user.sick.isWork)
