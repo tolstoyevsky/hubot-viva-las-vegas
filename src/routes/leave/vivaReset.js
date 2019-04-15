@@ -12,7 +12,7 @@ module.exports = async msg => {
   const leaveStart = msg.match[3] === '*' ? null : moment(msg.match[3], 'D.M.YYYY')
   const leaveEnd = msg.match[4] === '*' ? null : moment(msg.match[4], 'D.M.YYYY')
 
-  if (![leaveStart, leaveEnd].every(item => item.isValid())) {
+  if (![leaveStart, leaveEnd].every(item => item === null || item.isValid())) {
     return msg.send(vars.INVALID_DATE_MSG)
   }
 
@@ -20,24 +20,27 @@ module.exports = async msg => {
 
   if (user) {
     let day, month, year
-    const dates = []
+    const dates = {}
 
-    if (leaveStart !== '*') {
+    if (!user.vivaLasVegas || !user.vivaLasVegas.leaveStart || !user.vivaLasVegas.leaveEnd) {
+      return msg.send('У этого пользователя не планировался отпуск.')
+    }
+
+    if (leaveStart) {
       day = leaveStart.date()
-      month = leaveStart.month()
+      month = leaveStart.month() + 1
       year = leaveStart.year()
       user.vivaLasVegas.leaveStart = { day, month, year }
-
       dates.leaveStart = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
     } else {
       const leaveDate = Object.values(user.vivaLasVegas.leaveStart).join('.')
       dates.leaveStart = moment(leaveDate, 'D.M.YYYY').format('DD.MM.YYYY')
     }
 
-    if (leaveEnd !== '*') {
-      day = parseInt(leaveEnd.split('.')[0])
-      month = parseInt(leaveEnd.split('.')[1])
-      year = parseInt(leaveEnd.split('.')[2])
+    if (leaveEnd) {
+      day = leaveEnd.date()
+      month = leaveEnd.month() + 1
+      year = leaveEnd.year()
       user.vivaLasVegas.leaveEnd = { day, month, year }
       dates.leaveEnd = moment(`${day}.${month}.${year}`, 'D.M.YYYY').format('DD.MM.YYYY')
     } else {
