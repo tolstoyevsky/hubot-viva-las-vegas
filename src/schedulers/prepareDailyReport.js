@@ -1,4 +1,5 @@
 const moment = require('moment')
+const routines = require('hubot-routines')
 
 const vars = require('./../vars')
 const utils = require('./../utils')
@@ -8,8 +9,8 @@ const utils = require('./../utils')
   *
   * @param {Robot} robot - Robot instance.
   */
-module.exports = (robot) => {
-  const allUsers = Object.values(robot.brain.data.users)
+module.exports = async (robot) => {
+  const allUsers = await routines.getAllUsers(robot)
   const informer = {}
   const today = moment()
   if ([6, 0].includes(today.day())) return
