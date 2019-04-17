@@ -148,8 +148,8 @@ function isEqualDate (firstDate, secondsDate) {
  * @returns {string}
  */
 function noname (daysNumber) {
-  const exceptionDaysEnd = ['11', '12', '13', '14']
-  if (daysNumber.toString().endsWith(exceptionDaysEnd)) {
+  const exceptionDaysEnd = /11|12|13|14$/
+  if (daysNumber.toString().match(exceptionDaysEnd)) {
     return `${daysNumber} дней`
   }
 
