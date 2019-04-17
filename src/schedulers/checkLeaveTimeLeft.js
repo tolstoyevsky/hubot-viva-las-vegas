@@ -48,15 +48,22 @@ module.exports = async function (robot) {
       const obj = user.vivaLasVegas.leaveStart
       const reportStatus = user.vivaLasVegas.reportToCustomer
       const leaveStart = moment(`${obj.day}.${obj.month}.${obj.year}`, 'D.M.YYYY')
-      const amount = leaveStart.diff(moment(), 'days') + 1
+      const amount = leaveStart.diff(moment().startOf('day'), 'days')
       const days = Object.values(arguments).slice(1)
       const currentDay = days.indexOf(parseInt(amount)) >= 0
+
+      const when = (amount) => {
+        if (amount === 1) {
+          return 'завтра'
+        }
+        return `через ${utils.noname(amount)}`
+      }
 
       if (currentDay) {
         if ((amount === 1 && !reportStatus) || amount !== 1) {
           const emoji = isReport(reportStatus)[0]
           const status = isReport(reportStatus)[1]
-          message.push(`${emoji} @${user.name} уходит в отпуск через ${utils.noname(amount)}. Заказчик ${status}`)
+          message.push(`${emoji} @${user.name} уходит в отпуск ${when(amount)}. Заказчик ${status}`)
         }
 
         if (!reportStatus) {
