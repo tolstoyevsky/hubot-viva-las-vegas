@@ -36,14 +36,16 @@ module.exports = async msg => {
   const description = `Отгул ${timeOffType}`
   const date = candidate.timeOff.list.find(item => !item.type).date
 
-  utils.addEventToCalendar(
-    msg.robot,
-    start,
-    end,
-    candidate,
-    'Отгул',
-    description
-  )
+  if (vars.GOOGLE_API) {
+    utils.addEventToCalendar(
+      msg.robot,
+      start,
+      end,
+      candidate,
+      'Отгул',
+      description
+    )
+  }
 
   candidate.timeOff.list.find(item => !item.type).type = timeOffType
   delete user.timeOff.allocation
