@@ -34,7 +34,7 @@ module.exports = async (msg) => {
   if (customer.timeOff && customer.timeOff.allocation) {
     const candidate = await routines.findUserByName(msg.robot, customer.timeOff.allocation)
 
-    const date = moment(msg.match[2], vars.DATE_FORMAT)
+    const date = moment(`${day}.${month}`, vars.DATE_FORMAT)
     if (date.isBefore(moment())) {
       date.year(date.year() + 1)
     }
@@ -44,7 +44,7 @@ module.exports = async (msg) => {
     candidate.timeOff.list = candidate.timeOff.list || []
 
     if (!candidate.timeOff.list.find(item => !item.type)) {
-      const date = moment(msg.match[2], vars.DATE_FORMAT)
+      const date = moment(`${day}.${month}`, vars.DATE_FORMAT)
 
       if (date.isBefore(moment().startOf('day'))) {
         date.year(date.year() + 1)
@@ -70,9 +70,9 @@ module.exports = async (msg) => {
     const message = routines.buildMessageWithButtons(
       messageText,
       [
-        ['Отгул с отработкой', 'С отработкой'],
-        ['Отгул за свой счет', 'За свой счет'],
-        ['Отгул в счет отпуска', 'В счет отпуска'],
+        ['С отработкой', 'С отработкой'],
+        ['За свой счет', 'За свой счет'],
+        ['В счет отпуска', 'В счет отпуска'],
         ['Отмена', 'Отгул не нужен']
       ]
     )
