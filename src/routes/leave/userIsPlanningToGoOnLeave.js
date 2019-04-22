@@ -38,7 +38,7 @@ module.exports = async msg => {
         .then(eventId => { state.eventId = eventId })
     }
 
-    const message = `Пользователем @${customer.name} только что создана заявка на отпуск @${user.name} c ${from.format('DD.MM')} по ${to.format('DD.MM')}.`
+    const message = `Пользователем @${customer.name} только что создана и одобрена заявка на отпуск @${user.name} c ${from.format('DD.MM')} по ${to.format('DD.MM')}.`
     msg.robot.messageRoom(vars.LEAVE_COORDINATION_CHANNEL, message)
     msg.send(`Заявка на отпуск для пользователя @${user.name} создана и одобрена. ${googleEvent}`)
     const question = routines.buildMessageWithButtons(
