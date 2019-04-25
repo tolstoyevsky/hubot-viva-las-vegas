@@ -4,8 +4,6 @@ const routines = require('hubot-routines')
 const vars = require('./../vars')
 const utils = require('./../utils')
 
-const { Stack } = require('./../stack')
-
 async function getCustomerState (robot, customer) {
   customer.vivaLasVegas = customer.vivaLasVegas || {}
   if (customer.vivaLasVegas.allocation) {
@@ -178,25 +176,20 @@ module.exports = async (msg) => {
 
     msg.send(buttonsMessage)
   } else if (state.n === vars.WAITING_DATE_STATE) {
-    const dateOfWorkFromHome = new Stack(state.dateOfWorkFromHome)
-    switch (dateOfWorkFromHome.checkDate(date)) {
-      case 1:
-        msg.send('Не валидная дата.')
-        return
-      case 2:
-        msg.send(`Но ${date} уже прошло :rolling_eyes:. Выбери дату позднее ${moment().add(-1, 'day').format(vars.OUTPUT_DATE_FORMAT)}.`)
-        return
-      case 3:
-        msg.send('Нельзя запланировать день работы из дома больше, чем на две недели вперед.')
-        return
-      case 4:
-        msg.send(`Ты не можешь взять еще один день на этой неделе. Попробуй на следующей.`)
-        return
-      default:
-        dateOfWorkFromHome.push(date)
+    state.dateOfWorkFromHome = state.dateOfWorkFromHome || []
+
+    if (moment(date, 'D.M').isBefore(moment().startOf('day'))) {
+      state.dateRequested = `${date}.${moment().year() + 1}`
+    } else {
+      state.dateRequested = `${date}.${moment().year()}`
     }
 
-    state.dateRequested = dateOfWorkFromHome[1]
+    if (state.dateOfWorkFromHome.find(item => item.date === state.dateRequested)) {
+      state.n = vars.INIT_STATE
+      state.dateRequested = null
+      return msg.send('У тебя уже запланирована работа из дома на этот день, если хочешь запланировать другой день, начни с начала.')
+    }
+
     state.n = vars.WAITING_CONFIRMATION_STATE
     const buttonsMessage = routines.buildMessageWithButtons(
       'Согласован ли этот день с руководителем/тимлидом?',

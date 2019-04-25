@@ -17,9 +17,23 @@ module.exports = async (robot) => {
   let workFromHome = allUsers
     .filter(user => {
       if (user.vivaLasVegas && user.vivaLasVegas.dateOfWorkFromHome) {
-        const date = moment(user.vivaLasVegas.dateOfWorkFromHome[1], vars.CREATION_DATE_FORMAT)
+        const today = moment().format('DD.MM.YYYY')
 
-        return utils.isEqualDate(today, date)
+        user.vivaLasVegas.dateOfWorkFromHome = user.vivaLasVegas.dateOfWorkFromHome.filter(item => {
+          if (typeof item === 'object') {
+            return !moment(item.date, vars.CREATION_DATE_FORMAT).isBefore(moment().startOf('day'))
+          } else if (typeof item === 'string') {
+            return !moment(item, vars.CREATION_DATE_FORMAT).isBefore(moment().startOf('day'))
+          }
+        })
+
+        return user.vivaLasVegas.dateOfWorkFromHome.find(item => {
+          if (typeof item === 'object') {
+            return item.date === today
+          } else if (typeof item === 'string') {
+            return item === today
+          }
+        })
       }
     })
   let backFromVacation = allUsers

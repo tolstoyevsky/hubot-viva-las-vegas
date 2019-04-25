@@ -113,7 +113,9 @@ module.exports = async (robot) => {
 
   robot.respond(/(хочу в отпуск)|(@?(.+) хочет в отпуск)\s*/i, require('./routes/leave/leaveStart'))
   robot.respond(/работаю (из )?дома\s*/i, require('./routes/work-from-home/workFromHome'))
-  robot.respond(/не работаю (из )?дома\s*/i, require('./routes/work-from-home/workFromHomeCancel'))
+  robot.respond(/не работаю (из )?дома\s*$/i, require('./routes/work-from-home/workFromHomeCancel'))
+  robot.respond(/не работаю (из )?дома (\d{2}.\d{2}.\d{4})\s*$/i, require('./routes/work-from-home/workFromHomeCancelDate'))
+  robot.respond(/Я не отменяю работу из дома\s*$/, require('./routes/work-from-home/workFromHomeContinue'))
   robot.respond(vars.regExpMonthYear, require('./routes/monthYearRoute'))
   robot.respond(/(Да, планирует|Нет, не планирует)\s*/i, require('./routes/leave/userIsPlanningToGoOnLeave'))
   robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, require('./routes/leave/iAmPlanningToGoOnLeave'))
