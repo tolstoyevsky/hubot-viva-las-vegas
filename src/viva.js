@@ -8,6 +8,7 @@
 //    hubot хочу в отпуск - initiates a new leave request
 //    hubot болею - sets the status of being ill and adds the corresponding event to the calendar
 //    hubot не болею - removes status of being ill and stops the prolongation of the corresponding event in the calendar
+//    hubot меня не будет в офисе - combines the commands such as "хочу в отпуск", "работаю из дома" and "я болею"
 //    begin admin
 //      hubot @username хочет отгул - initiates a new time off request for the specified user
 //      hubot @username хочет в отпуск - initiates a new leave request on behalf of the specified user
@@ -111,6 +112,7 @@ module.exports = async (robot) => {
       })
   }
 
+  robot.respond(/(меня не будет( в офисе)?)|((я )?не в офисе)|((я )?не буду в офисе)\s*/i, require('./routes/notInOffice'))
   robot.respond(/(хочу в отпуск)|(@?(.+) хочет в отпуск)\s*/i, require('./routes/leave/leaveStart'))
   robot.respond(/работаю (из )?дома\s*/i, require('./routes/work-from-home/workFromHome'))
   robot.respond(/не работаю (из )?дома\s*$/i, require('./routes/work-from-home/workFromHomeCancel'))
