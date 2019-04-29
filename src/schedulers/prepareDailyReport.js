@@ -68,18 +68,10 @@ module.exports = async (robot) => {
       const m = user.vivaLasVegas.leaveStart.month
       const y = user.vivaLasVegas.leaveStart.year
       const leaveStart = moment(`${d}.${m}.${y}`, vars.CREATION_DATE_FORMAT)
-      if (utils.isEqualDate(today, leaveStart)) {
-        if (user.vivaLasVegas.requestStatus === vars.APPROVED_STATUS) {
-          return true
-        } else if (user.vivaLasVegas.requestStatus === vars.PENDING_STATUS) {
-          delete user.vivaLasVegas.requestStatus
-          robot.adapter.sendDirect(
-            { user: { name: user.name } },
-            `Твоя заявка на отпуск с ${leaveStart.format('DD.MM')} была удалена, так как до сих пор не была одобрена. Теперь ты можешь составить новую заявку на отпуск.`
-          )
-        }
-        delete user.vivaLasVegas.leaveStart
-      }
+
+      const isApproved = user.vivaLasVegas.requestStatus === vars.APPROVED_STATUS
+      const isToday = utils.isEqualDate(today, leaveStart)
+      return isToday && isApproved
     })
   let sickPeople = allUsers.filter(user => user.sick && !user.sick.isWork)
   let sickPeopleWorkHome = allUsers.filter(user => user.sick && user.sick.isWork)

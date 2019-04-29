@@ -12,10 +12,32 @@ const utils = require('./../utils')
  * @returns {Void}
  */
 module.exports = async (robot) => {
+  const today = moment().startOf('day')
   const users = await routines.getAllUsers(robot)
 
   for (const user of users) {
     const state = await utils.getStateFromBrain(robot, user.name)
+
+    if (state.requestStatus === vars.PENDING_STATUS) {
+      const { day, month, year } = state.leaveStart
+      const leaveStart = moment(`${day}.${month}.${year}`, vars.CREATION_DATE_FORMAT)
+      const waitingApproveDate = moment(state.creationDate, vars.CREATION_DATE_FORMAT)
+        .add(vars.MAXIMUM_LENGTH_OF_WAIT, 'days')
+
+      if (today.isSame(waitingApproveDate, 'day')) {
+        utils.cleanupState(state)
+        delete state.creationDate
+
+        robot.adapter.sendDirect(
+          { user: { name: user.name } },
+          `Твоя заявка на отпуск с ${leaveStart.format('DD.MM')} была удалена, так как до сих пор не была рассмотрена. Если ты все еще хочешь в отпуск, отправь новую заявку.`
+        )
+        robot.messageRoom(
+          vars.LEAVE_COORDINATION_CHANNEL,
+          `Заявка на отпуск @${user.name} с ${leaveStart.format('DD.MM')} осталась без внимания, срок ее ожидания прошел и она была удалена.`
+        )
+      }
+    }
 
     if (state.requestStatus === vars.APPROVED_STATUS) {
       const yesterday = moment().add(-1, 'day')
