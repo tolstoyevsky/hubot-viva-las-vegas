@@ -49,6 +49,7 @@ module.exports = async msg => {
 
   candidate.timeOff.list.find(item => !item.type).type = timeOffType
   delete user.timeOff.allocation
+  delete user.vivaLasVegas.n
 
   msg.send(`Отлично. Значит @${candidate.name} берет отгул ${timeOffType} ${date}.`)
   msg.robot.messageRoom(vars.LEAVE_COORDINATION_CHANNEL, `Пользователем @${user.name} только что оформлен отгул ${timeOffType} для @${candidate.name} на ${date}.`)

@@ -23,6 +23,7 @@ module.exports = async msg => {
   })
 
   delete user.timeOff.allocation
+  delete user.vivaLasVegas.n
 
   msg.send(`Отгул для @${candidate.name} отменен.`)
 }
