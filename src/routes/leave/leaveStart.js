@@ -14,13 +14,14 @@ module.exports = async function (msg) {
 
   if (msg.match[2]) { // @username хочет в отпуск
     const admin = await routines.findUserByName(msg.robot, msg.message.user.name)
-    admin.vivaLasVegas = admin.vivaLasVegas || {}
-    admin.vivaLasVegas.allocation = username
 
     if (!await routines.isAdmin(msg.robot, admin.name)) {
       msg.send(vars.ACCESS_DENIED_MSG)
       return
     }
+
+    admin.vivaLasVegas = admin.vivaLasVegas || {}
+    admin.vivaLasVegas.allocation = username
   }
 
   if (state.n !== undefined && state.n !== vars.INIT_STATE && state.n < vars.CONFIRM_STATE) {
