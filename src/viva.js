@@ -139,6 +139,12 @@ module.exports = async (robot) => {
    * @example viva reset @username DD.MM.YYYY-DD.MM.YYYY
    */
   robot.respond(/(viva reset @?(.+) (\d{1,2}\.\d{1,2}\.\d{4}|\*)[ -](\d{1,2}\.\d{1,2}\.\d{4}|\*))\s*/i, require('./routes/leave/vivaReset'))
+  /**
+   * Reset user state
+   *
+   * @example viva default @username
+   */
+  robot.respond(/viva default @?(.+)\s*/i, require('./routes/userDeafault'))
 
   if (vars.VIVA_REMINDER_SCHEDULER) {
     schedule.scheduleJob(vars.VIVA_REMINDER_SCHEDULER, () => require('./schedulers/sendReminderToChannel')(robot))

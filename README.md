@@ -58,9 +58,11 @@ some.user >> да
 
 ## Debug
 
-The following command is
+The following commands are
 * intended only for debugging purposes, so it's not present in the available Hubot commands list;
 * for admin use only.
+
+### Update vacation dates
 
 ```
 some.user >> hubot viva reset @user.name 15.10.2015 25.10.2015
@@ -69,6 +71,17 @@ some.user >> hubot viva reset @user.name 15.10.2015 25.10.2015
 ```
 
 In this case the leave start of the user named `user.name` was changed to `15.10.2015` (October 15 2015) and the leave end was changed to `25.10.2015` (October 25 2015). It is not mandatory to set both dates, if you replace one of them by `*` it will stay unchanged. It allows simulating returning and starting vacation.
+
+### Reset user state
+
+Command `viva default` is clearing all user temporary attributes.
+
+```
+some.user >> hubot viva default @user.name
+    hubot >> Состояние пользователя очищено.
+```
+
+It doesn't delete information about user vacation, time off, work from home and illing. It clears only temporary attributes used to navigate user though command scenarios.
 
 ## Integration with Google Calendar
 
