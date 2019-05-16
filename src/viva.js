@@ -112,27 +112,95 @@ module.exports = async (robot) => {
       })
   }
 
+  const { Router } = require('hubot-engine')
+  const router = new Router(robot)
+
+  // Leave
+  router.respond(
+    /(хочу в отпуск)|(@?(.+) хочет в отпуск)\s*/i,
+    require('./routes/leave/leaveStart')
+  )
+  router.respond(
+    /(Да, планирую|Нет, не планирую)\s*$/i,
+    require('./routes/leave/iAmPlanningToGoOnLeave')
+  )
+  router.respond(
+    /(отменить заявку @?(.+))\s*/i,
+    require('./routes/leave/leaveRequestCancel')
+  )
+  router.respond(
+    /(одобрить|отклонить) заявку @?(.+)\s*/i,
+    require('./routes/leave/leaveRequestApprove')
+  )
+  router.respond(
+    /(Да, планирует|Нет, не планирует)\s*/i,
+    require('./routes/leave/userIsPlanningToGoOnLeave')
+  )
+  router.respond(
+    /список заявок\s*/i,
+    require('./routes/leave/requestsList')
+  )
+  router.respond(
+    /(Да, предупрежден|Нет, не предупрежден)\s*$/i,
+    require('./routes/leave/customerNotified')
+  )
+
+  // Ill
+  router.respond(
+    /(я )?(болею|заболел)\s*$/i,
+    require('./routes/ill/iAmIll')
+  )
+  router.respond(
+    /(я )?(не болею|выздоровел)\s*/i,
+    require('./routes/ill/iAmNotIll')
+  )
+  router.respond(
+    /(Болею и работаю|Болею и не работаю)\s*/i,
+    require('./routes/ill/illAgree')
+  )
+  router.respond(
+    /(Да, они предупреждены, что я болею|Нет, они не предупреждены, что я болею)/i,
+    require('./routes/ill/yesTheyAreNotified')
+  )
+
+  // Time-off
+  router.respond(
+    /(отгул не нужен)\s*/i,
+    require('./routes/time-off/timeOffIsNotNeeded')
+  )
+  router.respond(
+    /(с отработкой)|(за свой счет)|(в счет отпуска)\s*/i,
+    require('./routes/time-off/timeOffType')
+  )
+  router.respond(
+    /(@?(.+) хочет отгул)\s*/i,
+    require('./routes/time-off/userWantsTimeOff')
+  )
+
+  // workFromHome
+  router.respond(
+    /работаю (из )?дома\s*/i,
+    require('./routes/work-from-home/workFromHome')
+  )
+  router.respond(
+    /(Да, согласован|Нет, не согласован)\s*$/i,
+    require('./routes/work-from-home/workFromHomeAgree')
+  )
+  router.respond(
+    /не работаю (из )?дома\s*$/i,
+    require('./routes/work-from-home/workFromHomeCancel')
+  )
+  router.respond(
+    /не работаю (из )?дома (\d{2}.\d{2}.\d{4})\s*$/i,
+    require('./routes/work-from-home/workFromHomeCancelDate')
+  )
+  router.respond(
+    /Я не отменяю работу из дома\s*$/,
+    require('./routes/work-from-home/workFromHomeContinue')
+  )
+
   robot.respond(/(меня не будет( в офисе)?)|((я )?не в офисе)|((я )?не буду в офисе)\s*/i, require('./routes/notInOffice'))
-  robot.respond(/(хочу в отпуск)|(@?(.+) хочет в отпуск)\s*/i, require('./routes/leave/leaveStart'))
-  robot.respond(/работаю (из )?дома\s*/i, require('./routes/work-from-home/workFromHome'))
-  robot.respond(/не работаю (из )?дома\s*$/i, require('./routes/work-from-home/workFromHomeCancel'))
-  robot.respond(/не работаю (из )?дома (\d{2}.\d{2}.\d{4})\s*$/i, require('./routes/work-from-home/workFromHomeCancelDate'))
-  robot.respond(/Я не отменяю работу из дома\s*$/, require('./routes/work-from-home/workFromHomeContinue'))
   robot.respond(vars.regExpMonthYear, require('./routes/monthYearRoute'))
-  robot.respond(/(Да, планирует|Нет, не планирует)\s*/i, require('./routes/leave/userIsPlanningToGoOnLeave'))
-  robot.respond(/(Да, планирую|Нет, не планирую)\s*$/i, require('./routes/leave/iAmPlanningToGoOnLeave'))
-  robot.respond(/(Да, согласован|Нет, не согласован)\s*$/i, require('./routes/work-from-home/workFromHomeAgree'))
-  robot.respond(/(Да, предупрежден|Нет, не предупрежден)\s*$/i, require('./routes/leave/customerNotified'))
-  robot.respond(/(отменить заявку @?(.+))\s*/i, require('./routes/leave/leaveRequestCancel'))
-  robot.respond(/(одобрить|отклонить) заявку @?(.+)\s*/i, require('./routes/leave/leaveRequestApprove'))
-  robot.respond(/список заявок\s*/i, require('./routes/leave/requestsList'))
-  robot.respond(/(я )?(болею|заболел)\s*$/i, require('./routes/ill/iAmIll'))
-  robot.respond(/(Болею и работаю|Болею и не работаю)\s*/i, require('./routes/ill/illAgree'))
-  robot.respond(/(Да, они предупреждены, что я болею|Нет, они не предупреждены, что я болею)/i, require('./routes/ill/yesTheyAreNotified'))
-  robot.respond(/(я )?(не болею|выздоровел)\s*/i, require('./routes/ill/iAmNotIll'))
-  robot.respond(/(@?(.+) хочет отгул)\s*/i, require('./routes/time-off/userWantsTimeOff'))
-  robot.respond(/(с отработкой)|(за свой счет)|(в счет отпуска)\s*/i, require('./routes/time-off/timeOffType'))
-  robot.respond(/(отгул не нужен)\s*/i, require('./routes/time-off/timeOffIsNotNeeded'))
   /**
    * Overwrites vacation dates.
    *
