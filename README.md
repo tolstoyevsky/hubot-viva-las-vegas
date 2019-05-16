@@ -2,7 +2,49 @@
 
 # hubot-viva-las-vegas
 
-A Hubot script which helps users to create leave requests.
+A Hubot script which helps users to initiate leave requests, time off requests and set/unset their status of being ill.
+
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Example Interaction](#example-interaction)
+- [Debug](#debug)
+  * [Update vacation dates](#update-vacation-dates)
+  * [Reset user state](#reset-user-state)
+- [Integration with Google Calendar](#integration-with-google-calendar)
+- [Authors](#authors)
+- [Licensing](#licensing)
+
+## Features
+
+- Leave requests
+  * Allows initiating a leave request with the maximum length specified via `MAXIMUM_LENGTH_OF_LEAVE` and the minimum amount of days before the request specified via `MINIMUM_DAYS_BEFORE_REQUEST`. Also, the bot automatically adds weekends to the leave length if the last day of the leave falls on a Friday.
+    + Each user can initiate only one leave request at a time.
+    + The bot sends the information with the details of the requests to the channel specified via `LEAVE_COORDINATION_CHANNEL`.
+  * Provides the admins with the centralized approach of approving, rejecting and canceling approved requests in the timeline specified via `MAXIMUM_LENGTH_OF_WAIT`.
+    + The admins can see the list of the leave requests sorted by their status (pending or approved).
+    + The bot sends daily reminders about requests with the pending status and automatically rejects the expired requests. When it happens, the script informs the user via DM and also all the users in the channel specified via `LEAVE_COORDINATION_CHANNEL`. In this case, the user can initiate one more leave request.
+    + If the request was approved, the bot checks 30, 14 and 1 days in advance if the user warned the customer about their absence; the results of the checks are passed to the channel, specified via `LEAVE_COORDINATION_CHANNEL`.
+    + If the integration with Google Calendar is enabled, the events will be reflected in the calendar.
+    + On the first day after the leave, the bot welcomes the user and make it possible to initiate another leave request.
+  * Allows the admins to initiate leave request on behalf of users, ignoring the restriction `MAXIMUM_LENGTH_OF_LEAVE` (see above).
+- Work from home (WFH) requests
+  * Allows users to send WHF request.
+  * If the integration with Google Calendar is enabled, the events will be reflected in the calendar.
+
+- Setting/unsetting status of being ill
+  * Each user can set the status of being ill and specify whether they are able to work from home or not.
+  * All the users in the channel, specified via `LEAVE_COORDINATION_CHANNEL`, will receive the message that the status of this or that user is marked as being ill; the bot will be naming the users with the status in the daily reports (see below) until the users tell the bot that they unset the status.
+  * If the integration with Google Calendar is enabled, the events will be reflected in the calendar.
+
+- Time off requests
+  * The admins can send the time off requests on behalf of the users.
+  * If the integration with Google Calendar is enabled, the events will be reflected in the calendar.
+
+- Daily reports
+  * The bot prepares the daily reports about the users who are out of the office; the reports are passed to the `#general` according to the schedule`VIVA_REPORT_SCHEDULER`.
 
 ## Prerequisites
 
