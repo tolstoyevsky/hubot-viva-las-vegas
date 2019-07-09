@@ -4,11 +4,12 @@ const routines = require('hubot-routines')
 const vars = require('../../vars')
 const utils = require('../../utils')
 const { AbstractView } = require('hubot-engine')
+const { APPROVE_LEAVE_REQUEST_PERMISSION } = require('../../vars')
 
 class View extends AbstractView {
   init (options) {
     options.app = 'leave'
-    options.admin = true
+    options.permissions = [APPROVE_LEAVE_REQUEST_PERMISSION]
   }
 
   async callback (msg) {

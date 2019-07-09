@@ -2,11 +2,12 @@ const routines = require('hubot-routines')
 
 const vars = require('../../vars')
 const { AbstractView } = require('hubot-engine')
+const { INITIATE_TIME_OFF_REQUEST_ON_BEHALF_OF_USER_PERMISSION } = require('../../vars')
 
 class View extends AbstractView {
   init (options) {
     options.app = 'timeOff'
-    options.admin = true
+    options.permissions = [INITIATE_TIME_OFF_REQUEST_ON_BEHALF_OF_USER_PERMISSION]
   }
 
   async callback (msg) {

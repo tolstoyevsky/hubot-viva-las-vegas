@@ -4,6 +4,7 @@ const moment = require('moment')
 const vars = require('../../vars')
 const utils = require('../../utils')
 const { AbstractView } = require('hubot-engine')
+const { SEND_LEAVE_REQUEST_PERMISSION, INITIATE_LEAVE_REQUEST_ON_BEHALF_OF_USER_PERMISSION } = require('../../vars')
 
 class View extends AbstractView {
   init (options) {
@@ -21,13 +22,28 @@ class View extends AbstractView {
     if (msg.match[2]) { // @username хочет в отпуск
       const admin = await routines.findUserByName(msg.robot, msg.message.user.name)
 
-      if (!await routines.isAdmin(msg.robot, admin.name)) {
+      const { user } = await this.robot.adapter.api.get(
+        'users.info',
+        { username: this.user.name }
+      )
+
+      if (!await routines.hasPermissions(msg.robot, user, INITIATE_LEAVE_REQUEST_ON_BEHALF_OF_USER_PERMISSION)) {
         msg.send(vars.ACCESS_DENIED_MSG)
         return
       }
 
       admin.vivaLasVegas = admin.vivaLasVegas || {}
       admin.vivaLasVegas.allocation = username
+    } else {
+      const { user } = await this.robot.adapter.api.get(
+        'users.info',
+        { username: this.user.name }
+      )
+
+      if (!await routines.hasPermissions(msg.robot, user, SEND_LEAVE_REQUEST_PERMISSION)) {
+        msg.send(vars.ACCESS_DENIED_MSG)
+        return
+      }
     }
 
     if (state.n !== undefined && state.n !== vars.INIT_STATE && state.n < vars.CONFIRM_STATE) {

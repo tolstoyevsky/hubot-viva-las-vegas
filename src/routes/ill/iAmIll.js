@@ -1,10 +1,12 @@
 const routines = require('hubot-routines')
 
 const { AbstractView } = require('hubot-engine')
+const { SET_UNSET_STATUS_OF_BEING_ILL_PERMISSION } = require('../../vars')
 
 class View extends AbstractView {
   init (options) {
     options.app = 'ill'
+    options.permissions = [SET_UNSET_STATUS_OF_BEING_ILL_PERMISSION]
   }
 
   callback (msg) {

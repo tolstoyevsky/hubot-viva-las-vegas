@@ -13,6 +13,17 @@ const MINIMUM_DAYS_BEFORE_REQUEST = parseInt(process.env.MINIMUM_DAYS_BEFORE_REQ
 const VIVA_REMINDER_SCHEDULER = process.env.VIVA_REMINDER_SCHEDULER || '0 0 7 * * *'
 const VIVA_REPORT_SCHEDULER = process.env.VIVA_REPORT_SCHEDULER || '0 0 11 * * *'
 
+// Permission id
+const SEND_LEAVE_REQUEST_PERMISSION = 'hubot-viva-send-leave-request'
+const APPROVE_LEAVE_REQUEST_PERMISSION = 'hubot-viva-approve-leave-request'
+const REJECT_LEAVE_REQUEST_PERMISSION = 'hubot-viva-reject-leave-request'
+const CANCEL_LEAVE_REQUEST_PERMISSION = 'hubot-viva-cancel-leave-request'
+const REQUESTS_LIST_PERMISSION = 'hubot-viva-get-leave-requests-list'
+const INITIATE_LEAVE_REQUEST_ON_BEHALF_OF_USER_PERMISSION = 'hubot-viva-initiate-new-leave-request-on-behalf-of-user'
+const INITIATE_TIME_OFF_REQUEST_ON_BEHALF_OF_USER_PERMISSION = 'hubot-viva-initiate-new-time-off-request-on-behalf-of-user'
+const WORK_FROM_HOME_PERMISSION = 'hubot-viva-work-from-home'
+const SET_UNSET_STATUS_OF_BEING_ILL_PERMISSION = 'hubot-viva-set-unset-status-of-being-ill'
+
 const INIT_STATE = 0
 const FROM_STATE = 1
 const TO_STATE = 2
@@ -78,5 +89,14 @@ module.exports = {
   OUTPUT_DATE_FORMAT,
   USER_FRIENDLY_DATE_FORMAT,
   CREATION_DATE_FORMAT,
-  statesMessages
+  statesMessages,
+  SEND_LEAVE_REQUEST_PERMISSION,
+  APPROVE_LEAVE_REQUEST_PERMISSION,
+  REJECT_LEAVE_REQUEST_PERMISSION,
+  CANCEL_LEAVE_REQUEST_PERMISSION,
+  REQUESTS_LIST_PERMISSION,
+  INITIATE_LEAVE_REQUEST_ON_BEHALF_OF_USER_PERMISSION,
+  INITIATE_TIME_OFF_REQUEST_ON_BEHALF_OF_USER_PERMISSION,
+  WORK_FROM_HOME_PERMISSION,
+  SET_UNSET_STATUS_OF_BEING_ILL_PERMISSION
 }
