@@ -19,8 +19,8 @@
     "googleapis": "^34.0.0",
     "moment": "^2.22.2",
     "node-schedule": "^0.6.0",
-    "hubot-routines": "git+https://github.com/tolstoyevsky/hubot-routines.git",
-    "hubot-engine": "git+https://github.com/seven48/hubot-engine.git"
+    "hubot-routines": "git+https://github.com/tolstoyevsky/hubot-routines.git#feature/add-checking-permission-function",
+    "hubot-engine": "git+https://github.com/seven48/hubot-engine.git#feature/permissions-checker"
   },
   "devDependencies": {
     "eslint": "^5.5.0",
